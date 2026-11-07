@@ -174,7 +174,7 @@ def normalize_npcs(keys, rows):
         out[str(nid)] = {
             "id": nid, "name": g(r, "name"),
             "min_level": g(r, "minLevel"), "max_level": g(r, "maxLevel"),
-            "rank": g(r, "rank"), "zone_id": g(r, "zoneID"),
+            "rank": g(r, "rank"), "zone_id": g(r, "zoneID"), "sub_name": g(r, "subName"),
             "spawns": {str(z): p for z, p in coord_map(g(r, "spawns")).items()},
             "quest_starts": ids(g(r, "questStarts")), "quest_ends": ids(g(r, "questEnds")),
             "faction_id": g(r, "factionID"), "npc_flags": g(r, "npcFlags"),

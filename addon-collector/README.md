@@ -23,11 +23,16 @@ Kleines Hilfs-Add-on, das beim normalen Spielen Daten für die Kalibrierung des 
 ## Was gesammelt wird
 
 - **Quests:** XP- und Gold-Belohnung im Quest-Dialog (vor dem Annehmen und beim Abgeben), Ziele mit Mengen, XP bei Abgabe, Zeiten.
-- **Kills:** Mob-Name, XP, Spielerlevel, Mob-Level (wenn anvisiert), Position, Abstand zum vorigen Kill.
+- **Kills:** Mob-Name, XP, Spielerlevel, Mob-Level (wenn anvisiert), Position, Abstand zum vorigen Kill (aus der XP-Chatmeldung).
+- **Kampfabschnitte:** Beginn, Dauer, Ziel (Name, Level, NPC-ID) und Position jedes Kampfes. So erscheinen auch Kills ohne XP (graue Mobs), ohne das Kampflog zu lesen.
 - **Drops:** Was pro Leiche gelootet wurde (NPC-ID und Item-IDs).
 - **Bewegung:** alle 2 Sekunden Position und Geschwindigkeit, solange du dich bewegst (prüft Kartengröße und Lauftempo).
 - **XP-Kurve:** `UnitXPMax` pro Level.
 - Es werden **keine** Charakternamen gespeichert, nur Klasse, Volk, Fraktion und Level.
+
+## Add-on-Regeln (wichtig)
+
+Seit den neuen Retail-Regeln („Midnight"), die auch für WoW Forever gelten, dürfen Add-ons bestimmte Funktionen nicht mehr nutzen, die der Blizzard-Oberfläche vorbehalten sind (vor allem rund um Kampfdaten wie das Kampflog). Version 0.1.2 las das Kampflog und wurde deshalb geblockt. **Version 0.1.3 liest das Kampflog nicht mehr.** Falls trotzdem eine Blockade-Meldung erscheint, bitte den Namen der Funktion aus der Meldung weitergeben.
 
 ## Zweck: passive Kalibrierung, keine Messaufgaben
 

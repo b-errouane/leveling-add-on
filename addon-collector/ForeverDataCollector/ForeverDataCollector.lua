@@ -12,10 +12,11 @@
 --   timeline  : accept / progress / turn-in events with time
 --
 -- Commands: /fdc status | pause | resume | scan | reset | note <text>
+-- NOTE: no combat-log access (restricted for addons since the Retail "Midnight" rules, which also apply to Forever).
 
 local ADDON = "ForeverDataCollector"
-local VERSION = "0.1.1"
-local MAX = { kills = 6000, loots = 6000, samples = 20000, timeline = 6000 }
+local VERSION = "0.1.3"
+local MAX = { kills = 6000, loots = 6000, samples = 20000, timeline = 6000, combats = 6000 }
 
 local db
 local paused = false
@@ -202,6 +203,7 @@ end
 local lastKillAt = 0
 local combatStart = nil
 local targetLevels = {}
+-- XP from a kill: "<Mob> dies, you gain 80 experience." (chat message, allowed for addons)
 local function onXpMessage(text)
     local xp = tonumber(string.match(text or "", "(%d+) experience"))
     if not xp then return end
@@ -213,8 +215,25 @@ local function onXpMessage(text)
     lastKillAt = now()
 end
 
-local function onCombatStart() combatStart = now() end
-local function onCombatEnd() combatStart = nil end
+-- Combat segments (replace the combat log, which addons may no longer read): start/end of each fight with the
+-- target at the start. Kills that give 0 XP (grey mobs) still show up as a segment.
+local segment = nil
+local function onCombatStart()
+    combatStart = now()
+    local name = safe(UnitName, "target")
+    segment = { t = combatStart, level = UnitLevel("player"), mob = name,
+        mobLevel = safe(UnitLevel, "target"), npc = npcIdFromGuid(safe(UnitGUID, "target")) }
+    local map, x, y = pos()
+    segment.map, segment.x, segment.y = map, x, y
+end
+local function onCombatEnd()
+    if segment then
+        segment.secs = now() - segment.t
+        push("combats", segment)
+        segment = nil
+    end
+    combatStart = nil
+end
 
 local function onTargetChanged()
     if UnitExists("target") and not UnitIsPlayer("target") then
@@ -275,6 +294,7 @@ local function init()
     db.loots = db.loots or {}
     db.samples = db.samples or {}
     db.timeline = db.timeline or {}
+    db.combats = db.combats or {}
     db.xpcurve = db.xpcurve or {}
     db.notes = db.notes or {}
     local version, build = GetBuildInfo()

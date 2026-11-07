@@ -29,6 +29,7 @@ ROOT = Path(__file__).resolve().parents[2]
 REPORTS = ROOT / "data/reports"
 ACCEPT_S, TURNIN_S = 10.0, 15.0  # Aufteilung des Quest-Overheads (zusammen 25 s)
 EPS = 0.05
+CLASS_NAMES = {"Warrior", "Paladin", "Hunter", "Rogue", "Priest", "Shaman", "Mage", "Warlock", "Druid"}
 
 
 class State:
@@ -87,15 +88,29 @@ class World:
         for n in npcs.values():
             if n["name"].startswith("Innkeeper") and pts(n, ZONE):
                 self.inns[n["id"]] = centroid(pts(n, ZONE))
-        self.home0 = self.inns.get(P["initial_home_npc"])
-        self.use_hearth = self.home0 is not None
+        # Heimat am Start: standardmaessig nicht gesetzt. Der Plan muss "Heimat setzen" selbst waehlen.
+        self.home0 = self.inns.get(P["initial_home_npc"]) if P.get("initial_home_npc") else None
+        self.use_hearth = bool(self.inns)
         self.fl_nodes, self.fl_edges = {}, {}  # {id: pos}, {(a, b): Sekunden}; in dieser Zone leer (siehe Doku)
         self.grind_mobs = [m for m in self.spawns if (npcs[str(m)]["rank"] or 0) == 0 and self.spawns[m]]
+        # Klassenlehrer: Positionen je Klasse (aus dem Untertitel "<Klasse> Trainer"). Der Plan ist
+        # klassenunabhaengig: ein Lehrer-Besuch kostet den erwarteten Weg ueber alle Klassen.
+        self.class_trainers = defaultdict(list)
+        for n in npcs.values():
+            sub = n.get("sub_name") or ""
+            cls = sub[:-len(" Trainer")] if sub.endswith(" Trainer") else None
+            if cls in CLASS_NAMES and pts(n, ZONE):
+                self.class_trainers[cls].append(centroid(pts(n, ZONE)))
         self.errands = []
         for e in P.get("errands", []):
-            npc = npcs.get(str(e["npc"]))
-            if npc and pts(npc, ZONE):
-                self.errands.append({**e, "pos": centroid(pts(npc, ZONE))})
+            if e.get("class_trainers"):
+                if self.class_trainers:
+                    allpos = [p for ps in self.class_trainers.values() for p in ps]
+                    self.errands.append({**e, "pos": centroid(allpos), "classes": dict(self.class_trainers)})
+            else:
+                npc = npcs.get(str(e["npc"]))
+                if npc and pts(npc, ZONE):
+                    self.errands.append({**e, "pos": centroid(pts(npc, ZONE))})
 
     # ---- Grundfunktionen -------------------------------------------------
     def mob_xp(self, level, m):
@@ -361,9 +376,19 @@ def expand(w, s, single):
     for e in w.errands:
         avail = sum(1 for lvl in e["steps"] if lvl <= s.level) - s.trained
         if avail > 0:
-            dt, mode, upd = w.go(s, e["pos"])
+            if "classes" in e:
+                # Erwarteter Weg ueber alle Klassen: je Klasse zum naechsten Lehrer dieser Klasse, dann Mittel.
+                per_class = []
+                for ps in e["classes"].values():
+                    per_class.append(min((w.go(s, p) for p in ps), key=lambda x: x[0]))
+                dt = sum(x[0] for x in per_class) / len(per_class)
+                nearest = min((w.go(s, p) + (p,) for ps in e["classes"].values() for p in ps), key=lambda x: x[0])
+                mode, upd, dest = nearest[1], nearest[2], nearest[3]
+            else:
+                dt, mode, upd = w.go(s, e["pos"])
+                dest = e["pos"]
             emit(dt + e["seconds"], mode, {**upd, "trained": s.trained + avail}, s.level, s.xp, s.total, s.done, s.open,
-                 f"{e['id']} besuchen ({avail} neue Stufe(n))", "errand", None, (), [], 0, e["pos"])
+                 f"{e['id']} besuchen ({avail} neue Stufe(n))", "errand", None, (), [], 0, dest)
     return out
 
 
@@ -488,7 +513,7 @@ def main():
     lines = [f"# Routenplanung (Strahlsuche + Monte Carlo), Mensch, Level 1 -> {a.target_level}", "",
              "ANNAHMEN (nicht gemessen): `pipeline/config/params.json`. Buendelung, Schlenker, Ruhestein und Grinden ergeben sich aus der Suche, es gibt keine Gruppen oder Schwellen.",
              f"Suchparameter: Strahlbreite {a.beam}, Zeit-Eimer {a.bucket:.0f} s. Zufall: {P['mc_runs']} Nachspielungen mit gewuerfelten Drops.",
-             f"Questlog-Plaetze: {w.slots}. Ruhestein-Heimat am Start: {'ja' if w.use_hearth else 'nein'}. Errands: {[e['id'] for e in w.errands] or 'keine'}.", ""]
+             f"Questlog-Plaetze: {w.slots}. Ruhestein-Heimat am Start: {'gesetzt' if w.home0 else 'nicht gesetzt'}, Gastwirte in der Zone: {len(w.inns)}. Errands: {[e['id'] for e in w.errands] or 'keine'}.", ""]
     results = {}
     for label, single in (("frei (beliebig viele Quests offen)", False), ("Vergleich: immer nur eine Quest offen", True)):
         end = plan_refined(w, a.target_level, a.beam, a.bucket, single)

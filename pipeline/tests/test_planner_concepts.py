@@ -35,9 +35,8 @@ class PlannerConcepts(unittest.TestCase):
 
     def test_hearth_chosen_only_when_ready_and_faster(self):
         w = self.w
-        s = w.initial_state()
-        far = (45.0, 80.0)
-        near_home = w.home0
+        near_home = next(iter(w.inns.values()))  # ein Gastwirt in der Zone
+        s = w.initial_state().clone(home=near_home)
         # Spieler weit weg von der Heimat, Ziel direkt bei der Heimat: Ruhestein ist schneller
         s_far = s.clone(pos=(5.0, 5.0), t=0.0, hearth_ready=0.0)
         dt, mode, upd = w.go(s_far, near_home)
@@ -49,6 +48,23 @@ class PlannerConcepts(unittest.TestCase):
         # Ziel liegt nahe am Spieler: kein Ruhestein
         s_near = s.clone(pos=near_home, hearth_ready=0.0)
         self.assertEqual(w.go(s_near, (near_home[0] + 1.0, near_home[1] + 1.0))[1], "walk")
+
+    def test_hearth_needs_a_home_to_be_set_first(self):
+        """Ohne gesetzte Heimat gibt es keinen Ruhestein-Weg. Danach muss 'Heimat setzen' vorher im Plan stehen."""
+        w = self.w
+        self.assertIsNone(w.home0, "Start-Heimat soll standardmaessig nicht gesetzt sein")
+        s = w.initial_state()
+        self.assertIsNone(s.home)
+        dt, mode, _ = w.go(s.clone(pos=(5.0, 5.0)), next(iter(w.inns.values())))
+        self.assertEqual(mode, "walk")
+        end = plan(w, 5, 20, 20.0, single=False)
+        self.assertIsNotNone(end)
+        home_set = False
+        for st in trace(end)[1:]:
+            if st.rec[0] == "sethome":
+                home_set = True
+            if st.rec[6] == "hearth":
+                self.assertTrue(home_set, "Ruhestein benutzt, bevor die Heimat gesetzt wurde")
 
     def test_known_flight_point_changes_the_route(self):
         """Gleiches Level, gleiche Quests, gleiche Position, aber anderer Flugpunkt-Zustand -> anderer Weg."""
@@ -85,8 +101,23 @@ class PlannerConcepts(unittest.TestCase):
         acts_lvl1 = [n.act for n in planner.expand(w, s, False) if n.rec[0] == "errand"]
         self.assertEqual(acts_lvl1, [])
         s4 = s.clone(level=4)
-        acts_lvl4 = [n.act for n in planner.expand(w, s4, False) if n.rec[0] == "errand"]
-        self.assertTrue(acts_lvl4)
+        errands = [n for n in planner.expand(w, s4, False) if n.rec[0] == "errand"]
+        self.assertTrue(errands)
+
+    def test_trainer_errand_is_class_agnostic(self):
+        """Kosten = Mittel der Wege zum jeweils naechsten Lehrer jeder Klasse, nicht ein fester Lehrer."""
+        P["errands"] = [copy.deepcopy(P["_errands_beispiel"])]
+        w = build_world()
+        self.assertGreaterEqual(len(w.class_trainers), 5, "mehrere Klassen sollten Lehrer in der Zone haben")
+        e = w.errands[0]
+        self.assertIn("classes", e)
+        s = w.initial_state().clone(level=4, home=None)
+        per_class = [min(w.go(s, p)[0] for p in ps) for ps in e["classes"].values()]
+        n = [x for x in planner.expand(w, s, False) if x.rec[0] == "errand"][0]
+        walk_only = n.rec[2] - e["seconds"]
+        self.assertAlmostEqual(walk_only, sum(per_class) / len(per_class), places=3)
+        self.assertGreaterEqual(walk_only, min(per_class) - 1e-6)
+        self.assertLessEqual(walk_only, max(per_class) + 1e-6)
 
     def test_lua_string_escaping(self):
         evil = 'a"b\\c\nd]]; os.execute("x") --'

@@ -132,8 +132,9 @@ Der Plan soll „Nebenbei"-Dinge ausdrücken und vom Routing erzeugen lassen kö
 Beim Levelaufstieg soll der Plan Besuche beim Klassenlehrer einplanen, um neue Fähigkeiten zu lernen. Das gehört in die Routenplanung als **eigene Handlung**, nicht als feste Regel („bei jedem Level zum Lehrer"):
 
 - **Handlung „Lehrer besuchen":** kostet Weg zum Lehrer plus Dialogzeit. Nutzen: Neue Fähigkeiten machen Kämpfe schneller und sicherer, das senkt die Kill-Zeit und das Risiko für alle folgenden Kills. Der Planer entscheidet über die Zeit, ob und wann sich der Besuch lohnt (zum Beispiel, wenn der Lehrer ohnehin auf dem Weg liegt oder sich mehrere Fähigkeiten angesammelt haben). Der Nutzen als Kill-Zeit-Faktor ist eine **Annahme je Klasse**, die mit den Sammeldaten kalibriert werden kann (Kampfdauer pro Level vor und nach einem Besuch).
-- **Voraussetzung: Klasse im Plan.** Der Plan ist bisher nur nach Volk (Mensch) erstellt. Für Lehrer braucht er die Klasse, denn Lehrer-Standorte und Fähigkeiten hängen daran.
-- **Im Spiel:** Das Add-on kann dynamisch erkennen, ob beim Lehrer etwas zu holen ist, indem es prüft, ob für die Klasse Zauber mit erreichtem Mindestlevel noch nicht gelernt sind. Ein fester Plan-Schritt ist dafür nicht nötig.
+- **Die Klasse ist nicht fest (Entscheidung des Nutzers, 8.11.2026).** Klassenlehrer sitzen meist in Hubs: In Northshire/Elwynn sind es genau zwei (Northshire-Abtei und Goldshire), und in jedem stehen die Lehrer aller Klassen nur etwa 100 yd auseinander. Der Plan bleibt daher **klassenunabhängig**. Ein Lehrer-Besuch kostet im Plan den **erwarteten Weg über alle Klassen** (Mittel der Wege zum jeweils nächsten Lehrer jeder Klasse). Das ist im Planer umgesetzt (Errand mit `class_trainers`).
+- **Im Spiel (noch zu bauen):** Das Add-on kennt die Klasse und löst den Besuch auf den konkreten Lehrer auf. Außerdem kann es dynamisch erkennen, ob beim Lehrer etwas zu holen ist (Zauber der Klasse mit erreichtem Mindestlevel, noch nicht gelernt), und den Besuch als **Einfügung** vorschlagen: „Lehrer liegt nur +N yd Umweg, dort neue Fähigkeiten". Das ist derselbe Einfügekosten-Gedanke wie beim Schlenker.
+- **Offene Annahme:** Der Nutzen pro erlernter Stufe (aktuell 3 % kürzere Kampfzeit) und die Fähigkeitsstufen (4, 6, 8, 10) sind geraten und klassenübergreifende Durchschnitte. Im Testlauf plant der Planer deshalb nur einen späten Sammelbesuch (Minute 50, drei Stufen auf einmal). Ob und wann sich ein Besuch lohnt, hängt direkt an dieser Annahme.
 
 **Datenlage (geprüft am 7.11.2026):**
 
@@ -143,8 +144,9 @@ Beim Levelaufstieg soll der Plan Besuche beim Klassenlehrer einplanen, um neue F
 | Mindestlevel der Zauber | Client-Tabelle `SpellLevels` | vorhanden |
 | Zauber je Klasse | Client-Tabelle `SkillLineAbility` (Klassenmaske, Art des Erwerbs) | vorhanden |
 | Welcher Lehrer welche Zauber lehrt | Client-Tabellen `Trainer`/`TrainerSpell` | **nicht vorhanden** (Tabelle nicht gefunden) |
+| Lehrer → Klasse | Untertitel der NPCs („Mage Trainer", „Warrior Trainer" …) in QuestieDB | **vorhanden und ausgewertet** (13 Lehrer-Typen in Northshire/Elwynn, 7 Klassen) |
 
-Die fehlende Zuordnung ist nicht kritisch: Ein Klassenlehrer der passenden Klasse lehrt die Klassenzauber. Die Zuordnung Lehrer → Klasse lässt sich aus dem Namen/Untertitel der Lehrer ableiten (z. B. „Mage Trainer"). Das ist noch nicht ausgewertet.
+Die fehlende Zauber-Zuordnung ist nicht kritisch: Ein Klassenlehrer der passenden Klasse lehrt die Klassenzauber.
 
 **Offene Fragen dazu:** Welche Fähigkeiten sind für das Tempo wirklich relevant (je Klasse sehr unterschiedlich)? Wie viel Kill-Zeit spart ein Level-Schub an Fähigkeiten? Wie wird der Besuch bei Klassen ohne Lehrer in der Startzone behandelt (Lehrer in einer Hauptstadt, weiter Weg)?
 

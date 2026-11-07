@@ -7,4 +7,5 @@
 ## SavedVariables: ForeverLevelerDB
 
 Plan.lua
+Reeval.lua
 ForeverLeveler.lua

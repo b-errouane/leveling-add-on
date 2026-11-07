@@ -73,6 +73,8 @@ Konsequenzen:
 
 Der Plan braucht **ein vorberechnetes Gerüst für den typischen Zustand und eine leichte Neubewertung im Spiel** für die Abweichung. Das Gerüst (Strahlsuche, offline) liefert die Referenz, das Add-on liest den echten Zustand (Questlog, Level, bekannte Flugpunkte, Ruhestein) und wählt daraus den nächsten Schritt. Eine Neuberechnung des vollen Plans im Spiel ist wegen der Rechenzeit nicht vorgesehen.
 
+**Umgesetzt (8.11.2026):** Die Live-Neubewertung im Add-on ist gebaut (`addon/ForeverLeveler/Reeval.lua`, Beschreibung in `addon/README.md`). Sie rechnet eine Vorausschau über die verbleibenden Schritte, bewertet nach „XP − λ · Zeit" und liest Level, Position, Questlog und Ruhestein aus dem Spiel. Offline getestet (`addon/tests/test_reeval.lua`), im Spiel noch nicht.
+
 ### Alltags-Stopps sind Gelegenheiten
 
 Lehrer, Händler (Verkaufen, Reparieren, Nahrung und Wasser), Taschenplatz und ähnliche Stopps werden als **normale Gelegenheiten** im Planer geführt, mit Kosten (Weg und Dauer) und Nutzen. Sie sind nicht fest vorgeschrieben und können mit anderen Wegen gebündelt werden (die Guides raten: „trainer or profession visit with a planned town stop"). Der Nutzen ist je nach Stopp anders: Lehrer verkürzt künftige Kämpfe, Händler schafft Platz oder Vorräte, Reparatur erhält die Kampfstärke.
@@ -84,7 +86,7 @@ Lehrer, Händler (Verkaufen, Reparieren, Nahrung und Wasser), Taschenplatz und �
 | Baustein | Stand |
 |---|---|
 | Zustand mit Ressourcen: Questlog-Plätze (Parameter `quest_log_slots`, Annahme 20), Heimat und Abklingzeit des Ruhesteins, bekannte Flugpunkte, erlernte Fähigkeitsstufen | umgesetzt |
-| Wegenetz: zu Fuß, Ruhestein, Flug; je Ziel der schnellste Weg im aktuellen Zustand | umgesetzt. Der Ruhestein wird im Plan genutzt. Flüge sind mit künstlichen Daten getestet, in den echten Daten gibt es für diese Zonen keine nutzbaren Flugverbindungen |
+| Wegenetz: zu Fuß, Ruhestein, Flug; je Ziel der schnellste Weg im aktuellen Zustand | umgesetzt. Die Heimat ist am Start **nicht** gesetzt (Nutzer), der Plan wählt „Heimat setzen" selbst und nutzt den Ruhestein erst danach. Flüge sind mit künstlichen Daten getestet, in den echten Daten gibt es für diese Zonen keine nutzbaren Flugverbindungen (Goldshire hat laut Nutzer keinen Flugpunkt, ein Questie-Eintrag „Erma" als Flugmeister dort ist wohl fehlerhaft) |
 | Gleicher Level und gleiche Quests, aber anderer Flugpunkt-Zustand → anderer Weg | umgesetzt und getestet |
 | Grind-Handlung (Mobs ohne offenen Questbedarf) | umgesetzt |
 | „Heimat setzen" und „Flugpunkt entdecken" als Gelegenheiten | umgesetzt (Gastwirt-Erkennung am Namen). Flugpunkt-Entdecken nur im Test, keine echten Daten |

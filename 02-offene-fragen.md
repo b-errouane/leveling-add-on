@@ -56,7 +56,7 @@ Kernfrage: Müssen wir ein eigenes Add-on schreiben, oder können wir ein besteh
 
 ## Lehrer und Klassen (neu)
 
-- [ ] **[Entscheidung] Welche Klasse zuerst?** Für Lehrer-Besuche (siehe [04-routenlogik.md](04-routenlogik.md)) und Kampftempo muss der Plan die Klasse kennen. Bisher gibt es nur einen Plan nach Volk (Mensch).
+- [x] **Klasse ist nicht fest (Nutzer, 8.11.2026).** Lehrer sitzen meist in Hubs, der Plan bleibt klassenunabhängig und rechnet den erwarteten Weg über alle Klassen. Das Add-on löst den konkreten Lehrer aus der Klasse des Spielers auf (siehe [04-routenlogik.md](04-routenlogik.md)). Offen bleibt das Kampftempo je Klasse (Kill-Zeit), das aus den Sammeldaten kommen soll.
 - [ ] Wie groß ist der Nutzen neuer Fähigkeiten pro Klasse und Level (Kill-Zeit), und wie wird er kalibriert (Sammeldaten ab niedrigem Charakter)?
 - [ ] Soll das Add-on im Spiel dynamisch erkennen, dass beim Lehrer neue Zauber warten (Zauber mit erreichtem Mindestlevel, noch nicht gelernt)?
 - [ ] Wie behandeln wir Klassen, deren Lehrer nicht in der Startzone sitzen?

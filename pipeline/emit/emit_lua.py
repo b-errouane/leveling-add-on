@@ -10,8 +10,8 @@ import argparse
 import datetime
 from pathlib import Path
 
-from pipeline.derive.derive import load, yards
-from pipeline.derive.planner import EPS, World, plan_refined, trace
+from pipeline.derive.derive import P, load, yards
+from pipeline.derive.planner import ACCEPT_S, EPS, TURNIN_S, World, plan_refined, trace
 from pipeline.derive.route import qxp_at
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -140,6 +140,63 @@ def build_steps(w, end, objects):
     return steps
 
 
+def enrich_for_reevaluation(w, steps, end):
+    """Ergaenzt pro Schritt, was das Add-on fuer die Neubewertung im Spiel braucht: Arbeitszeit, XP-Bausteine und
+    Abhaengigkeiten (Lua-Indizes ab 1). Die Neubewertung im Spiel rechnet damit eine kleine Vorausschau."""
+    accept_at, turnin_at, misc_at, kills_for = {}, {}, {}, {}
+    for i, s in enumerate(steps, 1):
+        if s["type"] == "accept":
+            accept_at[s["quest"]] = i
+        elif s["type"] == "turnin":
+            turnin_at[s["quest"]] = i
+        elif s["type"] == "misc":
+            misc_at[s["quest"]] = i
+        elif s["type"] in ("kill", "grind"):
+            for q in s.get("forQuests", []):
+                kills_for.setdefault(q, []).append(i)
+    errand_secs = {e["id"]: e["seconds"] for e in P.get("errands", [])}
+    for i, s in enumerate(steps, 1):
+        t = s["type"]
+        deps = []
+        if t == "accept":
+            s["work"] = ACCEPT_S
+            q = w.q[s["quest"]]
+            s["preAll"] = [x for x in q["prequest_group"]]
+            s["preAny"] = [x for x in q["prequest_single"]]
+        elif t == "turnin":
+            s["work"] = TURNIN_S
+            q = w.q[s["quest"]]
+            s["qlevel"] = q["quest_level"] or 1
+            s["qxp"] = round(qxp_at(q, s["qlevel"], w.table, w.est_tier))
+            deps = [accept_at.get(s["quest"]), misc_at.get(s["quest"])] + kills_for.get(s["quest"], [])
+        elif t == "misc":
+            s["work"] = w.need[s["quest"]]["obj_sec"]
+            deps = [accept_at.get(s["quest"])]
+        elif t in ("kill", "grind"):
+            npc = w.npcs[str(s["mob"])]
+            s["mobLevel"] = round(((npc["min_level"] or 1) + (npc["max_level"] or 1)) / 2)
+            s["elite"] = (npc["rank"] or 0) > 0
+            s["work"] = round(w.kill_work(s["mob"], s["count"]), 1)
+            deps = [accept_at.get(q) for q in s.get("forQuests", [])]
+        elif t == "sethome":
+            s["work"] = P["sethome_seconds"]
+        elif t == "errand":
+            s["work"] = next((v for k, v in errand_secs.items() if s["name"].startswith(k)), 45)
+        elif t == "discover":
+            s["work"] = P["flight_discover_seconds"]
+        s["deps"] = sorted({d for d in deps if d and d < i})
+    home = next(({"x": s["x"], "y": s["y"]} for s in steps if s["type"] == "sethome"), None)
+    return {
+        "runSpeed": P["run_speed_yards_per_s"], "mapW": w.scale[0], "mapH": w.scale[1],
+        "hearthCast": P["hearth_cast_seconds"], "eliteMult": P["elite_xp_multiplier"],
+        "questLogSlots": w.slots,
+        "xpToNext": [w.need_xp.get(lv, 0) for lv in range(1, 13)],
+        "xpFactor": [P["quest_xp_factor_by_level_diff"].get(str(d), 1.0) for d in range(10)],
+        "lambda": round(end.total / max(end.t, 1.0), 4),  # XP pro Sekunde des Referenzplans (Opportunitaetskosten)
+        "home": home,
+    }
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--target-level", type=int, default=10)
@@ -153,7 +210,9 @@ def main():
     if end is None:
         raise SystemExit("Kein Plan gefunden")
     steps = build_steps(w, end, objects)
+    params = enrich_for_reevaluation(w, steps, end)
     meta = {
+        "params": params,
         "generated": datetime.date.today().isoformat(),
         "race": "Human", "targetLevel": a.target_level, "plannedMinutes": round(end.t / 60, 1),
         "note": "Prototyp-Plan mit geratenen Zeitwerten, nicht kalibriert. Nur Northshire Valley und Elwynn Forest.",

@@ -17,11 +17,14 @@ function CreateFrame()
     local f = widget()
     f.CreateFontString = function() local fs = widget() texts[#texts + 1] = fs return fs end
     f.SetScript = function(_, name, fn) if name == "OnEvent" then captured = fn end end
+    f.CreateTexture = function() return widget() end
     return f
 end
 UIParent = {}
 BackdropTemplateMixin = nil
 function UnitLevel() return state.level end
+local clock = 1000
+function GetTime() clock = clock + 2 return clock end  -- every call advances time, so throttling never hides updates
 function UnitRace() return "Human", "Human" end
 C_QuestLog = {
     IsOnQuest = function(q) return state.onQuest[q] or false end,
@@ -36,6 +39,7 @@ TomTom = {
 SlashCmdList = {}
 
 dofile("addon/ForeverLeveler/Plan.lua")
+dofile("addon/ForeverLeveler/Reeval.lua")
 dofile("addon/ForeverLeveler/ForeverLeveler.lua")
 
 local function fire(event, ...) captured(nil, event, ...) end

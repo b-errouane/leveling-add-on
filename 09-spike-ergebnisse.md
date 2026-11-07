@@ -261,12 +261,33 @@ Der Planer (`pipeline/derive/planner.py`) wurde auf das Konzept aus [10-routing-
 
 | Variante | Plan | Mit Zufall (Mittel) | Quests abgegeben | Besonderheiten |
 |---|---|---|---|---|
-| frei geplant | **72,9 min** | 79,4 min (75–85) | 19 | bis zu 6 offen, 1× Ruhestein, 6 Grind-Portionen |
-| immer nur eine Quest offen | 77,5 min | 79,1 min | 11 | 18 Grind-Portionen, 1× Ruhestein |
+| frei geplant | **75,7 min** | 82,5 min (78–88) | 18 | bis zu 4 offen, „Heimat setzen" bei Minute 14,5, danach 1× Ruhestein, 8 Grind-Portionen |
+| immer nur eine Quest offen | 78,3 min | 79,2 min | 12 | 17 Grind-Portionen, Heimat setzen, 1× Ruhestein |
 
-Der Vorteil durch paralleles Arbeiten an Quests ist mit 6 % kleiner als vorher (14–15 %), weil Grinden jetzt als Alternative zur Verfügung steht, die bei der angenommenen Kill-Zeit (12 s) stark ist. Der Plan nutzt den Ruhestein gleich am Anfang, um „Rest and Relaxation" in Goldshire abzugeben (Heimat am Start: Innkeeper Farley, Annahme).
+Der Vorteil durch paralleles Arbeiten an Quests ist mit 3 % klein (vorher 14–15 %), weil Grinden jetzt als Alternative zur Verfügung steht, die bei der angenommenen Kill-Zeit (12 s) stark ist.
+
+**Korrektur (Nutzer, 8.11.2026):** Eine erste Fassung ging davon aus, dass der Ruhestein am Start schon an den Gastwirt in Goldshire gebunden ist, und nutzte ihn sofort. Das ist laut Nutzer falsch, die Heimat ist am Start nicht gesetzt. Jetzt startet der Spieler ohne Heimat (`initial_home_npc: null`), und der Plan muss „Heimat setzen" selbst wählen. Er tut das in Goldshire und nutzt den Ruhestein erst danach (Test `test_hearth_needs_a_home_to_be_set_first`).
+
+**Datenhinweis (Nutzer, 8.11.2026):** Goldshire hat weder in Classic noch in Forever einen Flugpunkt. Der Eintrag „Erma" (NPC 6749, Flugmeister-Flag, Level 29) mit Position in Goldshire in den Questie-Daten ist daher vermutlich fehlerhaft oder falsch platziert. Er geht nicht in den Plan ein (die Flugpunkte des Planers sind leer), sollte aber bei der Datenprüfung auffallen: Flugmeister-NPC in einer Zone ohne passenden `TaxiNodes`-Eintrag.
 
 **Das Ergebnis ist stark von der Kill-Zeit abhängig** (siehe Tabelle in 10-routing-konzepte.md): Bei 12 s pro Kill lohnt sich Grinden, bei 30 s sind Quests deutlich besser. Die Kill-Zeit ist ungemessen und für den derzeitigen Charakter nicht messbar. Das Sammel-Add-on soll sie später aus Spielen mit einem niedrigstufigen Charakter liefern.
+
+## Erste Sammeldaten aus dem Spiel (8.11.2026)
+
+Das Sammel-Add-on (Version 0.1.1) läuft im Forever-Client und hat beim `/reload` die Datei `ForeverDataCollector.lua` in `…\_forever_\WTF\Account\<Konto>\SavedVariables\` geschrieben. Sie wird als **Daten** gelesen (nicht ausgeführt) mit `python -m pipeline.collected.summarize`; die Kopie liegt lokal in `data/collected/` (gitignoriert). Die Datei stammt von einem Level-16-Charakter (Schurke, Mensch, Allianz), Spielversion 1.60.1, **Build 70862** (entspricht dem von uns genutzten wago.tools-Build).
+
+| Messung | Ergebnis | Bedeutung |
+|---|---|---|
+| Positionsproben | 599, Abstand im Median 2,0 s | Aufzeichnung funktioniert |
+| Laufgeschwindigkeit | 7 yd/s (383 Proben), Gehen 3,5 yd/s | bestätigt die Annahme `run_speed_yards_per_s` = 7 |
+| Flug | 30,36 yd/s (38 Proben, Karten Westfall/Stormwind/Elwynn) | passt zur Annahme `flight_speed_yards_per_s` = 30 |
+| Kartenmaßstab Elwynn | Verhältnis „Karten-Yards / (Tempo × Zeit)" im Median **0,98** (19 Paare) | bestätigt die aus `UiMapAssignment` abgeleitete Kartengröße (3.470,8 × 2.314,6 yd) auf etwa 2 % |
+| XP-Kurve | Level 16 → 16.000 | wie vorher gemessen |
+| Quest-XP im Dialog | „Redridge Rendezvous" (ID 2281) 120 XP, „Captain Sander's Hidden Treasure" (ID 136) 575 XP, jeweils Spielerlevel 16 = Quest-Level 16 | Classic-Tabelle: 115 und 580. Abweichung −4 % und +1 %: Die Classic-Werte sind eine gute, aber **nicht exakte** Näherung für Forever (n = 2) |
+| Loot | 46 Einträge, 18 verschiedene Items, 13 NPCs | Material für Drop-Stichproben, noch zu wenig für Raten |
+| Kills | 0 | Fehler im Erfassen: auf Level 16 geben graue Mobs keine XP, und Version 0.1.1 erkannte Kills nur über die XP-Meldung. Version 0.1.2 erfasst Kills über das Kampflog (NPC-ID, Kampfdauer, auch bei 0 XP) |
+
+Die Quest-Namen kommen auf Deutsch (deutscher Client), die Quest-IDs sind sprachunabhängig. Der Abgleich läuft deshalb über die IDs.
 
 ## Noch offen
 
