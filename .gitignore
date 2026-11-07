@@ -1,0 +1,9 @@
+data/raw/
+data/normalized/
+data/merged/
+__pycache__/
+*.pyc
+.env
+*.key
+data/derived/
+data/collected/

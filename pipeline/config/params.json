@@ -1,0 +1,27 @@
+{
+  "_hinweis": "ANNAHMEN, keine Messwerte. Alles hier muss spaeter mit echten Laeufen kalibriert werden.",
+  "run_speed_yards_per_s": 7.0,
+  "zone_size_yards": {
+    "_hinweis": "Karte [Breite, Hoehe] in Yards, abgeleitet aus UiMapAssignment (wago.tools, Forever-Build 1.60.1.70862, UiMap 1429 Elwynn Forest). Breite = Welt-Y-Bereich, Hoehe = Welt-X-Bereich.",
+    "12": [3470.83, 2314.58],
+    "default": [3470.83, 2314.58]
+  },
+  "seconds_per_kill": 12.0,
+  "seconds_per_object_interaction": 8.0,
+  "seconds_overhead_per_quest": 25.0,
+  "unknown_drop_rate": 0.35,
+  "elite_xp_multiplier": 2.0,
+  "elite_extra_seconds_per_kill": 25.0,
+  "mob_respawn_seconds": 120.0,
+  "corridor_yards": 40.0,
+  "mc_runs": 300,
+  "xp_to_next_level": {
+    "_hinweis": "1->2 bis 12->13. Gesichert: 1->2 = 400, 16->17 = 16000 (Messung), Summe bis Level 10 = 27600 (Fanseiten). Rest aus dem Gedaechtnis.",
+    "1": 400, "2": 900, "3": 1400, "4": 2100, "5": 2800, "6": 3600, "7": 4500, "8": 5400, "9": 6500,
+    "10": 7600, "11": 8800, "12": 10100
+  },
+  "quest_xp_factor_by_level_diff": {
+    "_hinweis": "ANNAHME: Spielerlevel minus Quest-Level -> Anteil der Quest-XP. Nicht gemessen.",
+    "0": 1.0, "1": 1.0, "2": 1.0, "3": 1.0, "4": 1.0, "5": 0.8, "6": 0.6, "7": 0.4, "8": 0.2, "9": 0.1
+  }
+}

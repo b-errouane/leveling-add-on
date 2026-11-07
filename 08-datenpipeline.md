@@ -146,9 +146,9 @@ leveling-add-on/
 | Nr. | Ziel | Ergebnis |
 |---|---|---|
 | **0** | **Spike (Machbarkeit)** | QuestieDB (Forever) einlesen, eine Startzone ausgeben. Prüfen, welche DB2-Tabellen verfügbar und lesbar sind. ForeverDB-Key beantragen und eine Quest abrufen. |
-| **1** | Normalisierung einer Zone | Zwischenformat steht, Prüfbericht für diese Zone |
+| **1** | Normalisierung einer Zone | **Erledigt (7.11.2026):** Zwischenformat steht (für alle Zonen), Prüfbericht für Northshire/Elwynn. Siehe [09-spike-ergebnisse.md](09-spike-ergebnisse.md). |
 | **2** | Zusammenführen und Prüfen | Quellen gemischt, Widersprüche und Lücken berichtet |
-| **3** | Ableitung für Level 1–10 | XP, Dauer, Reisezeit, Überlappungsindex, Referenzplan für den ersten Abschnitt |
+| **3** | Ableitung für Level 1–10 | XP, Dauer, Reisezeit, Überlappungsindex, Referenzplan für den ersten Abschnitt. **Teilweise (7.11.2026):** Einzelquest-Bewertung und Bündel-/Routen-Simulation (Greedy, nach Quest-Geber-Hub, gemeinsame Mobs zählen einmal) als Prototyp. Es fehlen ein vorberechneter Überlappungsindex, ein Referenzplan zum Mitgeben und die Kalibrierung der Annahmen. Siehe [09-spike-ergebnisse.md](09-spike-ergebnisse.md). |
 | **4** | Ausgabe als Lua und Laden im Spiel | Add-on-Rohgerüst liest die Daten, zeigt den nächsten Schritt, TomTom-Pfeil gesetzt, **ForeverDB-Quellenangabe sichtbar im Add-on** |
 | **5** | Ausbau auf alle Zonen und Level 1–60 | Vollständiges Paket |
 
