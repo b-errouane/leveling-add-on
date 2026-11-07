@@ -18,6 +18,7 @@ Ein World-of-Warcraft-Add-on, das beim Leveln hilft. Es kennt die Position des S
 | [06-datenmodell.md](06-datenmodell.md) | Entwurf des Datenmodells (Ziele, Quellen, Überlappungen, Vorberechnung) |
 
 | [08-datenpipeline.md](08-datenpipeline.md) | Plan der Datenpipeline: Quellen holen, normalisieren, zusammenführen, prüfen, ableiten, als Lua ausgeben, mit Meilensteinen |
+| [10-routing-konzepte.md](10-routing-konzepte.md) | Routing-Konzepte aus echten Guides (Schlenker, Grinden, Ruhestein, Questlog-Platz …), was im Modell fehlt und wie sich das verallgemeinern lässt |
 | [07-recherche-wow-forever.md](07-recherche-wow-forever.md) | Recherche: Was ist WoW Forever, welche Add-ons gibt es, was taugt als Basis |
 
 Zielversion: **WoW Forever** (offizielle dritte WoW-Version seit 4.11.2026, Level 1–60, über 1.000 neue Quests, Datenbasis daher nur teilweise Classic).

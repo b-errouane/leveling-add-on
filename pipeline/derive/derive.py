@@ -25,7 +25,8 @@ UNKNOWN_TRAVEL_YARDS = 700.0  # Ersatzweg, wenn Annahme- oder Abgabeposition in 
 
 
 def load(n):
-    return json.load(open(NORM / n, encoding="utf-8"))
+    with open(NORM / n, encoding="utf-8") as f:
+        return json.load(f)
 
 
 def mob_base_xp(player, mob):

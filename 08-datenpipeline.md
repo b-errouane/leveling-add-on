@@ -149,7 +149,7 @@ leveling-add-on/
 | **1** | Normalisierung einer Zone | **Erledigt (7.11.2026):** Zwischenformat steht (für alle Zonen), Prüfbericht für Northshire/Elwynn. Siehe [09-spike-ergebnisse.md](09-spike-ergebnisse.md). |
 | **2** | Zusammenführen und Prüfen | Quellen gemischt, Widersprüche und Lücken berichtet |
 | **3** | Ableitung für Level 1–10 | XP, Dauer, Reisezeit, Überlappungsindex, Referenzplan für den ersten Abschnitt. **Teilweise (7.11.2026):** Einzelquest-Bewertung und Bündel-/Routen-Simulation (Greedy, nach Quest-Geber-Hub, gemeinsame Mobs zählen einmal) als Prototyp. Es fehlen ein vorberechneter Überlappungsindex, ein Referenzplan zum Mitgeben und die Kalibrierung der Annahmen. Siehe [09-spike-ergebnisse.md](09-spike-ergebnisse.md). |
-| **4** | Ausgabe als Lua und Laden im Spiel | Add-on-Rohgerüst liest die Daten, zeigt den nächsten Schritt, TomTom-Pfeil gesetzt, **ForeverDB-Quellenangabe sichtbar im Add-on** |
+| **4** | Ausgabe als Lua und Laden im Spiel | Add-on-Rohgerüst liest die Daten, zeigt den nächsten Schritt, TomTom-Pfeil gesetzt, **ForeverDB-Quellenangabe sichtbar im Add-on**. **Teilweise (7.11.2026):** `pipeline/emit/emit_lua.py` erzeugt `addon/ForeverLeveler/Plan.lua` (75 Schritte, Level 1–10, Mensch), das Add-on `addon/ForeverLeveler` zeigt Schritt und setzt den TomTom-Pfeil; Logik offline mit Stub-API getestet, im Spiel noch nicht. Noch keine ForeverDB-Daten, daher noch keine Quellenangabe im Add-on nötig. Siehe `addon/README.md`. |
 | **5** | Ausbau auf alle Zonen und Level 1–60 | Vollständiges Paket |
 
 Der erste echte Prüfstein ist **Meilenstein 4**: Erst dort zeigt sich im Spiel, ob die vorberechneten Daten tragen.

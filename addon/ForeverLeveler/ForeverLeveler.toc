@@ -1,0 +1,10 @@
+## Interface: 16001
+## Title: Forever Leveler (prototype)
+## Notes: Shows the next leveling step from a precomputed XP-per-hour plan and sets the TomTom arrow. Display only, no automation.
+## Author: private project
+## Version: 0.1.0
+## OptionalDeps: TomTom
+## SavedVariables: ForeverLevelerDB
+
+Plan.lua
+ForeverLeveler.lua

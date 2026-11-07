@@ -54,6 +54,20 @@ Kernfrage: Müssen wir ein eigenes Add-on schreiben, oder können wir ein besteh
 - [ ] Wie prüfen wir die Ergebnisse, ohne alles von Hand zu testen? (Automatische Tests auf den Daten, Konsistenzprüfungen, Stichproben im Spiel)
 - [ ] Wie testen wir das Add-on? Gibt es einen Weg außerhalb des Spiels (Lua-Tests, Mock der WoW-API), und wie sieht der Test im Client aus?
 
+## Lehrer und Klassen (neu)
+
+- [ ] **[Entscheidung] Welche Klasse zuerst?** Für Lehrer-Besuche (siehe [04-routenlogik.md](04-routenlogik.md)) und Kampftempo muss der Plan die Klasse kennen. Bisher gibt es nur einen Plan nach Volk (Mensch).
+- [ ] Wie groß ist der Nutzen neuer Fähigkeiten pro Klasse und Level (Kill-Zeit), und wie wird er kalibriert (Sammeldaten ab niedrigem Charakter)?
+- [ ] Soll das Add-on im Spiel dynamisch erkennen, dass beim Lehrer neue Zauber warten (Zauber mit erreichtem Mindestlevel, noch nicht gelernt)?
+- [ ] Wie behandeln wir Klassen, deren Lehrer nicht in der Startzone sitzen?
+
+## Reisen und Spielerzustand (neu)
+
+- [x] **Plan hängt vom Zustand ab:** Bekannte Flugpunkte, Ruhestein-Heimat und Abklingzeit ändern die beste Route bei gleichem Level und gleichen Quests (siehe [10-routing-konzepte.md](10-routing-konzepte.md)). **Entschieden (8.11.2026): beides.** Vorberechnetes Gerüst für den typischen Zustand plus leichte Neubewertung im Spiel für die Abweichung.
+- [ ] Welche Zustandsgrößen kann das Add-on im Forever-Client sicher lesen (bekannte Flugpunkte, Heimat, Ruhestein-Abklingzeit)?
+- [ ] Welche Wegverbindungen fehlen in unseren Daten (Schiffe, Zeppeline, Portale, Ruhestein-Ziele)?
+- [ ] Alltags-Stopps (Lehrer, Händler, Reparatur, Taschen) als Gelegenheiten mit Nutzen-Funktion: Welche Daten brauchen wir (Händlerliste, Preise, Haltbarkeit)?
+
 ## Technik und Betrieb
 
 - [ ] Wie wird das Add-on verteilt (CurseForge, GitHub, nur privat)?

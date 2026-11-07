@@ -253,6 +253,21 @@ Auslöser (Nutzer, 7.11.2026): Wege addieren sich nicht einfach (z. B. mehrere A
 
 **Einordnung der Zeit:** 82 Minuten gelten für einen Spieler, der die Route kennt und fehlerfrei spielt. Das ist ein **Optimalfall** und nicht die Erfahrung eines normalen Spielers. Vermutlich fehlt außerdem noch einiges, das die Zeit real verlängert: Ausruhen und Heilen nach Kämpfen, langsamere Kämpfe eines Level-1-Charakters (12 s pro Kill sind geraten), Tode und Laufwege zurück, Händler-/Lehrer-Stopps, Taschen, Zielsuche, Konkurrenz um Mobs. Für die neuen Quests ohne XP ist die XP geschätzt und könnte zu hoch liegen. Ein Vergleichswert aus dem Spiel (tatsächliche Spielzeit bis Level 10, mit Angabe, wie routiniert gespielt wurde) fehlt noch.
 
+## Update 8.11.2026: Planer auf Gelegenheiten, Ressourcen und Wegenetz umgebaut
+
+Der Planer (`pipeline/derive/planner.py`) wurde auf das Konzept aus [10-routing-konzepte.md](10-routing-konzepte.md) umgebaut: Questlog-Plätze, Ruhestein (Heimat, Abklingzeit), bekannte Flugpunkte, Grind-Handlung, Heimat setzen, Lehrer-Errand (standardmäßig aus). Tests: `python -m unittest pipeline.tests.test_planner_concepts`.
+
+**Ergebnis mit den Standardparametern (Level 1 → 10, Strahlbreite 150):**
+
+| Variante | Plan | Mit Zufall (Mittel) | Quests abgegeben | Besonderheiten |
+|---|---|---|---|---|
+| frei geplant | **72,9 min** | 79,4 min (75–85) | 19 | bis zu 6 offen, 1× Ruhestein, 6 Grind-Portionen |
+| immer nur eine Quest offen | 77,5 min | 79,1 min | 11 | 18 Grind-Portionen, 1× Ruhestein |
+
+Der Vorteil durch paralleles Arbeiten an Quests ist mit 6 % kleiner als vorher (14–15 %), weil Grinden jetzt als Alternative zur Verfügung steht, die bei der angenommenen Kill-Zeit (12 s) stark ist. Der Plan nutzt den Ruhestein gleich am Anfang, um „Rest and Relaxation" in Goldshire abzugeben (Heimat am Start: Innkeeper Farley, Annahme).
+
+**Das Ergebnis ist stark von der Kill-Zeit abhängig** (siehe Tabelle in 10-routing-konzepte.md): Bei 12 s pro Kill lohnt sich Grinden, bei 30 s sind Quests deutlich besser. Die Kill-Zeit ist ungemessen und für den derzeitigen Charakter nicht messbar. Das Sammel-Add-on soll sie später aus Spielen mit einem niedrigstufigen Charakter liefern.
+
 ## Noch offen
 
 - Die Pipeline soll den QuestieDB-Export reproduzierbar anstoßen können. Dafür fehlt noch eine dauerhafte Lösung: Die Berechtigung zum Ausführen des Repo-Lua, oder ein von uns eingerichtetes Lua 5.1 (z. B. scoop-Bucket `versions`, `lua51`).

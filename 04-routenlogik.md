@@ -113,6 +113,41 @@ Die Vorberechnung macht den teuren Teil, die Live-Phase nur leichte Neubewertung
 - Zone und Position
 - Wiedereinstieg nach Logout, Tod oder größerer Abweichung
 
+## Nebenbei-Quests und Schlenker (Wunsch des Nutzers vom 7.11.2026)
+
+Der Plan soll „Nebenbei"-Dinge ausdrücken und vom Routing erzeugen lassen können. Beispiel: Ein Gegner hat eine sehr schlechte Drop-Rate, die Quest hat keine Folgequest. Dann bleibt sie lange im Log und wird immer erledigt, wenn man an den Gegnern vorbeikommt. Das spart das Warten auf Respawns. Ein Schritt kann so aussehen: „Wir wollen eigentlich zu A, machen aber erst einen Schlenker zu B, töten dort X und gehen dann weiter zu A."
+
+**Was der Planer schon hergibt:** Offene Quests teilen sich Kills automatisch, Spawns benötigter Mobs im Korridor entlang jeder Strecke werden mitgenommen, und Respawn-Wartezeiten sind im Modell. Ob eine Quest nur nebenbei läuft, ergibt sich allein aus der Zeitbewertung. Es gibt keine Regel „Drop-Rate unter X ist Nebenbei".
+
+**Was in der Ausgabe dazugekommen ist (Stand 7.11.2026):**
+- **Schlenker:** Jeder Kill-Schritt trägt den Umweg in Yards (`detour`), also wie viel länger der Weg über den Kill-Ort ist als der direkte Weg zum Ziel des nächsten Schritts. Es gibt keine Schwelle, der Wert wird immer angezeigt. Das Add-on schreibt dann „Schlenker (+N yd): … töten" und „dann weiter: …". Im aktuellen Plan haben alle 12 Kill-Schritte einen Wert (12 bis 655 yd).
+- **Nebenbei-Quests:** Quests mit Kill-/Drop-Zielen, die nie gezielt bearbeitet werden, sind im Plan mit `side` markiert (aktuell 2). Quests, die am Planende noch offen sind, stehen in `meta.background` (aktuell 4 Einträge). `/fl side` listet sie im Spiel.
+
+**Auffälligkeit:** Zwei Quests („Wolves Across the Border", „Brotherhood of Thieves") werden angenommen und bleiben am Ende offen. Das Modell bewertet den Fortschritt durch Kills unterwegs, die erwartete Fertigstellung kommt aber im Planzeitraum nicht zustande. Das kostet nur wenige Sekunden fürs Annehmen, ist aber ein Hinweis, dass die Nebenbei-Bewertung noch ungenau ist.
+
+**Offen:** Gezieltes Erzeugen von „Schlenker, um Respawns zu umgehen" als eigene Handlung (der Planer teilt Kills bisher nur in zwei Größen auf, kleinste und größte Menge), und Erwartungswerte statt Würfeln bei sehr seltenen Drops (Streuung bestimmt, wie lange eine Nebenbei-Quest im Log bleibt).
+
+## Lehrer-Besuche (geplant, Wunsch des Nutzers vom 7.11.2026)
+
+Beim Levelaufstieg soll der Plan Besuche beim Klassenlehrer einplanen, um neue Fähigkeiten zu lernen. Das gehört in die Routenplanung als **eigene Handlung**, nicht als feste Regel („bei jedem Level zum Lehrer"):
+
+- **Handlung „Lehrer besuchen":** kostet Weg zum Lehrer plus Dialogzeit. Nutzen: Neue Fähigkeiten machen Kämpfe schneller und sicherer, das senkt die Kill-Zeit und das Risiko für alle folgenden Kills. Der Planer entscheidet über die Zeit, ob und wann sich der Besuch lohnt (zum Beispiel, wenn der Lehrer ohnehin auf dem Weg liegt oder sich mehrere Fähigkeiten angesammelt haben). Der Nutzen als Kill-Zeit-Faktor ist eine **Annahme je Klasse**, die mit den Sammeldaten kalibriert werden kann (Kampfdauer pro Level vor und nach einem Besuch).
+- **Voraussetzung: Klasse im Plan.** Der Plan ist bisher nur nach Volk (Mensch) erstellt. Für Lehrer braucht er die Klasse, denn Lehrer-Standorte und Fähigkeiten hängen daran.
+- **Im Spiel:** Das Add-on kann dynamisch erkennen, ob beim Lehrer etwas zu holen ist, indem es prüft, ob für die Klasse Zauber mit erreichtem Mindestlevel noch nicht gelernt sind. Ein fester Plan-Schritt ist dafür nicht nötig.
+
+**Datenlage (geprüft am 7.11.2026):**
+
+| Benötigt | Quelle | Stand |
+|---|---|---|
+| Lehrer-NPCs mit Position | QuestieDB, NPC-Flag „Lehrer" (Bit 16) | vorhanden, 28 Lehrer-NPCs mit Position in Northshire/Elwynn (Klassen- und Berufslehrer gemischt) |
+| Mindestlevel der Zauber | Client-Tabelle `SpellLevels` | vorhanden |
+| Zauber je Klasse | Client-Tabelle `SkillLineAbility` (Klassenmaske, Art des Erwerbs) | vorhanden |
+| Welcher Lehrer welche Zauber lehrt | Client-Tabellen `Trainer`/`TrainerSpell` | **nicht vorhanden** (Tabelle nicht gefunden) |
+
+Die fehlende Zuordnung ist nicht kritisch: Ein Klassenlehrer der passenden Klasse lehrt die Klassenzauber. Die Zuordnung Lehrer → Klasse lässt sich aus dem Namen/Untertitel der Lehrer ableiten (z. B. „Mage Trainer"). Das ist noch nicht ausgewertet.
+
+**Offene Fragen dazu:** Welche Fähigkeiten sind für das Tempo wirklich relevant (je Klasse sehr unterschiedlich)? Wie viel Kill-Zeit spart ein Level-Schub an Fähigkeiten? Wie wird der Besuch bei Klassen ohne Lehrer in der Startzone behandelt (Lehrer in einer Hauptstadt, weiter Weg)?
+
 ## Offene Punkte
 
 - Wie werden Synergien effizient berechnet? Alle Bündel durchzuprobieren explodiert kombinatorisch, also braucht es Näherungen oder vorberechnete Überlappungen.

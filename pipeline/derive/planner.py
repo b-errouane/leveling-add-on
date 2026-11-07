@@ -1,18 +1,18 @@
-"""Routenplaner (Prototyp): Buendelung ergibt sich aus der Planung, nicht aus vorgegebenen Gruppen.
+"""Routenplaner: eine Abfolge von Gelegenheiten, Buendelung und Schlenker ergeben sich aus der Suche.
 
-Der Planer sucht eine Abfolge von Handlungen: Quest annehmen, Mobs toeten, Objekt-/Erkundungsziel
-erledigen, Quest abgeben. Offene Quests teilen sich Kills automatisch. Ob mehrere Quests gleichzeitig
-offen sind, entscheidet allein die Zeit: Es gibt keine Gruppen, keinen Radius, keine Schwellenwerte.
+Grundbausteine (siehe 10-routing-konzepte.md):
+- Zustand: Position, Level/XP, offene Quests (Questlog-Platz ist begrenzt), Ruhestein (Heimat,
+  Abklingzeit), bekannte Flugpunkte, erlernte Faehigkeitsstufen (Lehrer).
+- Wegenetz: zu Fuss, Ruhestein, Flugpunkte. Fuer jedes Ziel gilt der schnellste Weg im aktuellen Zustand,
+  deshalb kann derselbe Spieler (gleiches Level, gleiche Quests) je nach Flugpunkten/Ruhestein eine andere
+  beste Route haben. Kills auf dem Weg gibt es nur beim Gehen.
+- Gelegenheiten: Quest annehmen / abgeben, Mobs toeten (zaehlt fuer alle offenen Quests), Objekt-/Erkundungsziel,
+  Grinden (Mobs ohne offenen Questbedarf), Heimat setzen, Flugpunkt entdecken, Lehrer (Errand aus params.json).
+  Mengen und Reihenfolge ergeben sich aus der Suche, es gibt keine Gruppen, keinen Radius, keine festen Regeln.
+- Zufall: Der gefundene Plan wird mit gewuerfelten Drops nachgespielt (Monte Carlo).
 
-Modell des Spielers:
-- Position als Zustand, Wege als Linienzug durch die Stationen (Luftlinie in Yards).
-- Mobs als echte Spawn-Punkte: Anlaufen des naechsten Spawns, Laufweg zwischen den Kills (mittlerer
-  Nachbarabstand), Wartezeit auf Respawns, wenn mehr Kills gebraucht werden als Spawns da sind.
-- Kills auf dem Weg: Spawns benoetigter Mobs entlang einer Strecke werden mitgenommen.
-- Zufall: Der gefundene Plan wird mehrfach mit gewuerfelten Drops nachgespielt (Monte Carlo).
-
-Suche: Strahlsuche nach Zeit-Eimern (Suchparameter, keine Spielregel).
-Annahmen fuer Zeiten und Groessen: pipeline/config/params.json (nicht gemessen).
+Suche: Strahlsuche nach Zeit-Eimern. Kandidaten-Mengen (Kill-Portionen, Grind-Kandidaten) sind
+Suchhilfen aus dem Zustand abgeleitet, keine Spielregeln. Alle Zeiten/Groessen: params.json (Annahmen).
 Aufruf: python -m pipeline.derive.planner [--target-level 10] [--beam 150] [--bucket 20]
 """
 import argparse
@@ -32,11 +32,17 @@ EPS = 0.05
 
 
 class State:
-    __slots__ = ("t", "pos", "level", "xp", "total", "done", "open", "parent", "act", "rec", "shared")
+    __slots__ = ("t", "pos", "level", "xp", "total", "done", "open", "parent", "act", "rec", "shared",
+                 "home", "hearth_ready", "flights", "trained")
 
-    def __init__(self, t, pos, level, xp, total, done, open_, parent, act, rec, shared):
-        self.t, self.pos, self.level, self.xp, self.total = t, pos, level, xp, total
-        self.done, self.open, self.parent, self.act, self.rec, self.shared = done, open_, parent, act, rec, shared
+    def __init__(self, **kw):
+        for k in self.__slots__:
+            setattr(self, k, kw.get(k))
+
+    def clone(self, **kw):
+        d = {k: getattr(self, k) for k in self.__slots__}
+        d.update(kw)
+        return State(**d)
 
 
 def _seg_dist(p, a, b, sx, sy):
@@ -74,7 +80,24 @@ class World:
         self.need_xp = {int(k): v for k, v in P["xp_to_next_level"].items() if k.isdigit()}
         self.start = centroid(pts(npcs["197"], ZONE))  # Marshal McBride
         self._hits = {}
+        self.excluded = set()  # Quests, die der Plan angenommen, aber nie abgegeben hat (Bereinigung)
+        # Ressourcen und Wegenetz
+        self.slots = int(P["quest_log_slots"])
+        self.inns = {}
+        for n in npcs.values():
+            if n["name"].startswith("Innkeeper") and pts(n, ZONE):
+                self.inns[n["id"]] = centroid(pts(n, ZONE))
+        self.home0 = self.inns.get(P["initial_home_npc"])
+        self.use_hearth = self.home0 is not None
+        self.fl_nodes, self.fl_edges = {}, {}  # {id: pos}, {(a, b): Sekunden}; in dieser Zone leer (siehe Doku)
+        self.grind_mobs = [m for m in self.spawns if (npcs[str(m)]["rank"] or 0) == 0 and self.spawns[m]]
+        self.errands = []
+        for e in P.get("errands", []):
+            npc = npcs.get(str(e["npc"]))
+            if npc and pts(npc, ZONE):
+                self.errands.append({**e, "pos": centroid(pts(npc, ZONE))})
 
+    # ---- Grundfunktionen -------------------------------------------------
     def mob_xp(self, level, m):
         npc = self.npcs[str(m)]
         ml = round(((npc["min_level"] or level) + (npc["max_level"] or level)) / 2)
@@ -93,21 +116,47 @@ class World:
     def nearest_spawn(self, pos, m):
         return min(self.spawns[m], key=lambda p: yards(pos, p, ZONE))
 
-    def kill_time(self, pos, m, k):
-        """Zeit fuer k Kills an Mob m: Anlaufen, Kampf, Laufen zwischen Spawns, Warten auf Respawns."""
-        npc_elite = (self.npcs[str(m)]["rank"] or 0) > 0
-        ks = kill_seconds(npc_elite)
-        entry = self.nearest_spawn(pos, m)
+    def speed_mult(self, trained):
+        """Kampf-Zeitfaktor durch erlernte Faehigkeitsstufen (Errand 'Lehrer')."""
+        f = 1.0
+        for e in self.errands:
+            f *= (1.0 - e.get("speedup", 0.0)) ** trained
+        return f
+
+    def kill_work(self, m, k, mult=1.0):
+        """Kampf, Laufen zwischen den Spawns und Warten auf Respawns fuer k Kills (ohne Anreise)."""
+        elite = (self.npcs[str(m)]["rank"] or 0) > 0
+        ks = kill_seconds(elite) * mult
         n_sp = max(1, len(self.spawns[m]))
         hop = self.nn[m] / P["run_speed_yards_per_s"]
-        walk = self.leg(pos, entry) + max(0.0, k - 1) * hop
         fight = k * ks
+        walk = max(0.0, k - 1) * hop
         rounds = k / n_sp
         wait = 0.0
         if rounds > 1:
             cycle = n_sp * (ks + hop)
             wait = (rounds - 1) * max(0.0, P["mob_respawn_seconds"] - cycle)
         return walk + fight + wait
+
+    def go(self, s, dest):
+        """Schnellster Weg von s.pos nach dest im aktuellen Zustand: (Sekunden, Modus, Aenderungen am Zustand)."""
+        best = (self.leg(s.pos, dest), "walk", {})
+        if s.home is not None and s.t >= s.hearth_ready:
+            t = P["hearth_cast_seconds"] + self.leg(s.home, dest)
+            if t < best[0]:
+                best = (t, "hearth", {"hearth_ready": s.t + P["hearth_cast_seconds"] + P["hearth_cooldown_seconds"]})
+        known = [n for n in s.flights if n in self.fl_nodes]
+        if len(known) >= 2:
+            for a in known:
+                to_a = self.leg(s.pos, self.fl_nodes[a])
+                for b in known:
+                    e = self.fl_edges.get((a, b))
+                    if e is None:
+                        continue
+                    t = to_a + e + self.leg(self.fl_nodes[b], dest)
+                    if t < best[0]:
+                        best = (t, "flight", {})
+        return best
 
     def hits(self, a, b, m):
         """Wie viele Spawns von m liegen im Korridor entlang der Strecke a->b (memoisiert)."""
@@ -119,6 +168,11 @@ class World:
                 c = P["corridor_yards"]
                 self._hits[key] = sum(1 for p in self.spawns[m] if _seg_dist(p, a, b, self.scale[0] / 100, self.scale[1] / 100) <= c)
         return self._hits[key]
+
+    def initial_state(self):
+        return State(t=0.0, pos=self.start, level=1, xp=0.0, total=0.0, done=frozenset(), open={}, parent=None,
+                     act="start", rec=("start", None, 0.0, (), (), self.start, "walk"), shared=0,
+                     home=self.home0, hearth_ready=0.0, flights=frozenset(), trained=0)
 
 
 def open_entry(w, qid):
@@ -146,7 +200,8 @@ def credit(w, s):
 
 def key(w, s):
     sig = tuple(sorted((qid, tuple(round(r) for _, r in k), misc > 0) for qid, (k, misc) in s.open.items()))
-    return (round(s.pos[0] / 4), round(s.pos[1] / 4), s.level, s.done, sig)
+    ready = 0 if s.home is None or s.t >= s.hearth_ready else 1 + int((s.hearth_ready - s.t) // 600)
+    return (round(s.pos[0] / 4), round(s.pos[1] / 4), s.level, s.done, sig, s.home, ready, s.flights, s.trained)
 
 
 def enroute(w, s, dest, open_, skip_mob=None):
@@ -155,15 +210,16 @@ def enroute(w, s, dest, open_, skip_mob=None):
     for kills, _ in open_.values():
         for m, r in kills:
             rem_by_mob[m] = max(rem_by_mob[m], r)
-    events, extra_t, extra_xp, level, xp = [], 0.0, 0.0, s.level, s.xp
+    events, extra_t, extra_xp = [], 0.0, 0.0
+    mult = w.speed_mult(s.trained)
     for m, r in rem_by_mob.items():
         if r <= EPS or m == skip_mob or (w.npcs[str(m)]["rank"] or 0) > 0:
             continue
         h = min(w.hits(s.pos, dest, m), r)
         if h > 0:
-            xp1, _ = w.mob_xp(level, m)
+            xp1, _ = w.mob_xp(s.level, m)
             events.append((m, float(h)))
-            extra_t += h * kill_seconds(False)
+            extra_t += h * kill_seconds(False) * mult
             extra_xp += h * xp1
     return events, extra_t, extra_xp
 
@@ -181,73 +237,138 @@ def apply_kills(open_, events):
 
 def expand(w, s, single):
     out = []
+    mult = w.speed_mult(s.trained)
 
-    def finish(dt, pos, level, xp, total, done, open_, act, rec_type, qid, kills_main, events, shared_add):
-        # Kills auf dem Weg wirken auf die bereits offenen Quests (vor dem eigenen Effekt der Handlung)
-        out.append(State(s.t + dt, pos, level, xp, total, done, open_, s, act,
-                         (rec_type, qid, dt, tuple(events), tuple(kills_main), pos), s.shared + shared_add))
+    def emit(dt, mode, upd, level, xp, total, done, open_, act, rec_type, qid, kills_main, events, shared_add, pos):
+        ns = s.clone(t=s.t + dt, pos=pos, level=level, xp=xp, total=total, done=done, open=open_, parent=s, act=act,
+                     rec=(rec_type, qid, dt, tuple(events), tuple(kills_main), pos, mode), shared=s.shared + shared_add)
+        for k, v in upd.items():
+            setattr(ns, k, v)
+        out.append(ns)
 
-    def en_route_then(dest, skip=None):
-        ev, et, exp_ = enroute(w, s, dest, s.open, skip)
+    def travel(dest, skip=None):
+        """Weg zu dest inkl. Kills auf dem Weg (nur beim Gehen). Gibt alles zurueck, was die Handlung braucht."""
+        dt_go, mode, upd = w.go(s, dest)
+        if mode == "walk":
+            ev, et, exp_ = enroute(w, s, dest, s.open, skip)
+        else:
+            ev, et, exp_ = [], 0.0, 0.0
         op = apply_kills(s.open, ev)
         level, xp = w.levelup(s.level, s.xp + exp_)
-        helped = sum(1 for m, _ in ev for kills, _ in s.open.values() if dict(kills).get(m, 0) > EPS) - len(ev)
-        return ev, et, exp_, op, level, xp, max(0, helped)
+        helped = max(0, sum(1 for m, _ in ev for kills, _ in s.open.values() if dict(kills).get(m, 0) > EPS) - len(ev))
+        return dt_go + et, mode, upd, ev, exp_, op, level, xp, helped
 
-    # 1) Quest annehmen
-    if not (single and s.open):
+    # 1) Quest annehmen (Questlog-Platz ist begrenzt)
+    if not (single and s.open) and len(s.open) < w.slots:
         for q in w.pool:
             qid = q["id"]
-            if qid in s.open or not available(q, s.done, s.level, w.race_bit):
+            if qid in s.open or qid in w.excluded or not available(q, s.done, s.level, w.race_bit):
                 continue
             nd = w.need[qid]
-            ev, et, exp_, op, level, xp, helped = en_route_then(nd["giver"])
+            dt, mode, upd, ev, exp_, op, level, xp, helped = travel(nd["giver"])
             op = dict(op)
             op[qid] = open_entry(w, qid)
-            dt = w.leg(s.pos, nd["giver"]) + ACCEPT_S + et
-            finish(dt, nd["giver"], level, xp, s.total + exp_, s.done, op, f"annehmen {q['name']}", "accept", qid, (), ev, helped)
-    # 2) Mobs toeten
+            emit(dt + ACCEPT_S, mode, upd, level, xp, s.total + exp_, s.done, op, f"annehmen {q['name']}", "accept", qid, (), ev, helped, nd["giver"])
+
+    # 2) Mobs toeten (zaehlt fuer alle offenen Quests, die den Mob brauchen) und 3) Grinden
     rem_by_mob = {}
     for qid, (kills, _) in s.open.items():
         for m, r in kills:
             if r > EPS:
                 rem_by_mob.setdefault(m, []).append(r)
+    kill_cands = {}
     for m, rs in rem_by_mob.items():
-        for k in sorted({min(rs), max(rs)}):
-            dt = w.kill_time(s.pos, m, k)
+        n_sp = max(1, len(w.spawns[m]))
+        xp1, _ = w.mob_xp(s.level, m)
+        to_lvl = math.ceil(max(0.0, w.need_xp.get(s.level, 0) - s.xp) / xp1) if xp1 > 0 else 0
+        chunks = {min(rs), max(rs), min(max(rs), float(n_sp))}
+        if 0 < to_lvl <= max(rs):
+            chunks.add(float(to_lvl))  # bis zum naechsten Level-Up
+        kill_cands[m] = (sorted(c for c in chunks if c > EPS), True)
+    # Grind-Kandidaten: Mobs ohne offenen Questbedarf, nach XP pro Sekunde (Suchhilfe, kein Gebot)
+    ranked = []
+    for m in w.grind_mobs:
+        if m in kill_cands:
+            continue
+        xp1, elite = w.mob_xp(s.level, m)
+        if xp1 <= 0:
+            continue
+        entry = w.nearest_spawn(s.pos, m)
+        rate = xp1 / (w.leg(s.pos, entry) + kill_seconds(False) * mult)
+        ranked.append((rate, m))
+    ranked.sort(reverse=True)
+    for _, m in ranked[: int(P["grind_candidates"])]:
+        n_sp = max(1, len(w.spawns[m]))
+        xp1, _ = w.mob_xp(s.level, m)
+        to_lvl = math.ceil(max(0.0, w.need_xp.get(s.level, 0) - s.xp) / xp1) if xp1 > 0 else 0
+        chunks = {float(n_sp)}
+        if 0 < to_lvl <= P["grind_max_chunk"]:
+            chunks.add(float(to_lvl))
+        kill_cands[m] = (sorted(chunks), False)
+    for m, (chunk_list, for_quest) in kill_cands.items():
+        entry = w.nearest_spawn(s.pos, m)
+        for k in chunk_list:
+            dt_go, mode, upd = w.go(s, entry)
+            dt = dt_go + w.kill_work(m, k, mult)
             xp1, _ = w.mob_xp(s.level, m)
             op = apply_kills(s.open, [(m, k)])
             level, xp = w.levelup(s.level, s.xp + k * xp1)
-            helped = sum(1 for r in rs if r > EPS)
-            end = w.mob_pos[m]
-            finish(dt, end, level, xp, s.total + k * xp1, s.done, op,
-                   f"toeten {w.npcs[str(m)]['name']} x{k:.0f} (hilft {helped} Quests)", "kill", None, [(m, k)], [], helped - 1)
-    # 3) Objekt-/Erkundungsziele
+            helped = sum(1 for r in rem_by_mob.get(m, []) if r > EPS)
+            name = w.npcs[str(m)]["name"]
+            if for_quest:
+                emit(dt, mode, upd, level, xp, s.total + k * xp1, s.done, op,
+                     f"toeten {name} x{k:.0f} (hilft {helped} Quests)", "kill", None, [(m, k)], [], max(0, helped - 1), w.mob_pos[m])
+            else:
+                emit(dt, mode, upd, level, xp, s.total + k * xp1, s.done, op,
+                     f"grinden {name} x{k:.0f}", "grind", None, [(m, k)], [], 0, w.mob_pos[m])
+
+    # 4) Objekt-/Erkundungsziele
     for qid, (kills, misc) in s.open.items():
         if misc > EPS:
             area = centroid(w.need[qid]["misc_area"]) or w.need[qid]["giver"]
-            ev, et, exp_, op, level, xp, helped = en_route_then(area)
+            dt, mode, upd, ev, exp_, op, level, xp, helped = travel(area)
             op = dict(op)
             op[qid] = (op[qid][0], 0.0)
-            dt = w.leg(s.pos, area) + misc + et
-            finish(dt, area, level, xp, s.total + exp_, s.done, op, f"erledigen {w.q[qid]['name']}", "misc", qid, (), ev, helped)
-    # 4) Abgeben
+            emit(dt + misc, mode, upd, level, xp, s.total + exp_, s.done, op, f"erledigen {w.q[qid]['name']}", "misc", qid, (), ev, helped, area)
+
+    # 5) Abgeben
     for qid, (kills, misc) in s.open.items():
         if misc <= EPS and all(r <= EPS for _, r in kills):
             nd = w.need[qid]
             dest = nd["ender"] or nd["giver"]
-            ev, et, exp_, op, level, xp, helped = en_route_then(dest)
+            dt, mode, upd, ev, exp_, op, level, xp, helped = travel(dest)
             op = {k: v for k, v in op.items() if k != qid}
             gain = qxp_at(w.q[qid], level, w.table, w.est_tier)
             level, xp = w.levelup(level, xp + gain)
-            dt = w.leg(s.pos, dest) + TURNIN_S + et
-            finish(dt, dest, level, xp, s.total + exp_ + gain, s.done | {qid}, op, f"abgeben {w.q[qid]['name']}",
-                   "turnin", qid, (), ev, helped)
+            emit(dt + TURNIN_S, mode, upd, level, xp, s.total + exp_ + gain, s.done | {qid}, op,
+                 f"abgeben {w.q[qid]['name']}", "turnin", qid, (), ev, helped, dest)
+
+    # 6) Heimat setzen (Ruhestein): Gelegenheit, die spaetere Wege verkuerzt
+    for inn_id, ipos in w.inns.items():
+        if s.home != ipos:
+            dt, mode, upd = w.go(s, ipos)
+            emit(dt + P["sethome_seconds"], mode, {**upd, "home": ipos}, s.level, s.xp, s.total, s.done, s.open,
+                 f"Heimat setzen: {w.npcs[str(inn_id)]['name']}", "sethome", None, (), [], 0, ipos)
+
+    # 7) Flugpunkt entdecken
+    for node, npos in w.fl_nodes.items():
+        if node not in s.flights:
+            dt, mode, upd = w.go(s, npos)
+            emit(dt + P["flight_discover_seconds"], mode, {**upd, "flights": s.flights | {node}}, s.level, s.xp, s.total,
+                 s.done, s.open, f"Flugpunkt entdecken: {node}", "discover", None, (), [], 0, npos)
+
+    # 8) Errands (z. B. Lehrer): neue Faehigkeitsstufen lernen verkuerzt kuenftige Kaempfe
+    for e in w.errands:
+        avail = sum(1 for lvl in e["steps"] if lvl <= s.level) - s.trained
+        if avail > 0:
+            dt, mode, upd = w.go(s, e["pos"])
+            emit(dt + e["seconds"], mode, {**upd, "trained": s.trained + avail}, s.level, s.xp, s.total, s.done, s.open,
+                 f"{e['id']} besuchen ({avail} neue Stufe(n))", "errand", None, (), [], 0, e["pos"])
     return out
 
 
 def plan(w, target, beam, bucket, single, horizon=4 * 3600):
-    start = State(0.0, w.start, 1, 0.0, 0.0, frozenset(), {}, None, "start", ("start", None, 0.0, (), (), w.start), 0)
+    start = w.initial_state()
     buckets = {0: [start]}
     best = None
     for b in range(int(horizon // bucket) + 1):
@@ -272,6 +393,24 @@ def plan(w, target, beam, bucket, single, horizon=4 * 3600):
     return best
 
 
+def plan_refined(w, target, beam, bucket, single, max_rounds=4):
+    """Plan suchen und bereinigen: Quests, die am Ende offen sind (angenommen, nie abgegeben), kosten nur
+    Zeit. Sie werden aus dem Pool genommen und der Plan wird neu gesucht, solange das nicht langsamer ist."""
+    w.excluded = set()
+    best = plan(w, target, beam, bucket, single)
+    for _ in range(max_rounds):
+        if best is None or not best.open:
+            break
+        w.excluded = w.excluded | set(best.open)
+        cand = plan(w, target, beam, bucket, single)
+        if cand is not None and cand.t <= best.t + 1.0:
+            best = cand
+        else:
+            w.excluded = w.excluded - set(best.open)
+            break
+    return best
+
+
 def trace(s):
     steps = []
     while s is not None:
@@ -281,20 +420,18 @@ def trace(s):
 
 
 def _geom(rng, p):
-    """Anzahl Versuche bis zum ersten Erfolg (Erfolgswahrscheinlichkeit p)."""
     u = rng.random()
     return 1 if p >= 1 else max(1, math.ceil(math.log(1 - u) / math.log(1 - p)))
 
 
 def replay(w, recs, target, rng):
     """Spielt den Plan mit gewuerfelten Drops nach. Fehlende Items kosten Zusatz-Kills (Weg hin und zurueck)."""
-    t, pos, level, xp = 0.0, w.start, 1, 0.0
+    t, level, xp = 0.0, 1, 0.0
     open_ = {}
     for rec in recs[1:]:
-        typ, qid, dt, events, kills_main, end = rec
+        typ, qid, dt, events, kills_main, end = rec[:6]
         t += dt
-        got = list(events) + list(kills_main)
-        for m, k in got:
+        for m, k in list(events) + list(kills_main):
             xp1, _ = w.mob_xp(level, m)
             xp += k * xp1
             for st in open_.values():
@@ -307,15 +444,13 @@ def replay(w, recs, target, rng):
             open_[qid] = {"recv": defaultdict(float), "req": req}
         elif typ == "turnin":
             st = open_.pop(qid)
-            # Einsammeln fehlender Items: Zusatz-Kills, Weg zum Spawn und zurueck
             for m, need_k in st["req"].items():
                 miss = need_k - st["recv"][m]
                 if miss > 0.5:
-                    npc_elite = (w.npcs[str(m)]["rank"] or 0) > 0
-                    t += 2 * w.leg(end, w.mob_pos[m]) + miss * kill_seconds(npc_elite)
+                    elite = (w.npcs[str(m)]["rank"] or 0) > 0
+                    t += 2 * w.leg(end, w.mob_pos[m]) + miss * kill_seconds(elite)
                     xp += miss * w.mob_xp(level, m)[0]
             xp += qxp_at(w.q[qid], level, w.table, w.est_tier)
-        pos = end
         level, xp = w.levelup(level, xp)
         if level >= target:
             return t
@@ -329,21 +464,34 @@ def monte_carlo(w, end, target, runs, seed=1):
     return {"mean": statistics.mean(ts), "median": ts[len(ts) // 2], "p10": ts[int(0.1 * len(ts))], "p90": ts[int(0.9 * len(ts))]}
 
 
+def build_world(race_bit=1):
+    return World(load("quests.json"), load("npcs.json"), load("objects.json"), load("items.json"),
+                 load("drops.json"), load("quest_xp_table.json"), race_bit)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--target-level", type=int, default=10)
     ap.add_argument("--beam", type=int, default=150)
     ap.add_argument("--bucket", type=float, default=20.0)
     ap.add_argument("--race-bit", type=int, default=1)
+    ap.add_argument("--with-trainer", action="store_true", help="Beispiel-Errand 'Lehrer' aus params.json aktivieren")
+    ap.add_argument("--set", action="append", default=[], metavar="NAME=WERT",
+                    help="Parameter aus params.json ueberschreiben (Zahlen), z. B. --set seconds_per_kill=25")
     a = ap.parse_args()
-    w = World(load("quests.json"), load("npcs.json"), load("objects.json"), load("items.json"),
-              load("drops.json"), load("quest_xp_table.json"), a.race_bit)
+    for kv in a.set:
+        name, val = kv.split("=", 1)
+        P[name] = float(val)
+    if a.with_trainer:
+        P["errands"] = [P["_errands_beispiel"]]
+    w = build_world(a.race_bit)
     lines = [f"# Routenplanung (Strahlsuche + Monte Carlo), Mensch, Level 1 -> {a.target_level}", "",
-             "ANNAHMEN (nicht gemessen): `pipeline/config/params.json`. Buendelung ergibt sich aus der Suche, es gibt keine Gruppen oder Schwellen.",
-             f"Suchparameter: Strahlbreite {a.beam}, Zeit-Eimer {a.bucket:.0f} s. Zufall: {P['mc_runs']} Nachspielungen mit gewuerfelten Drops.", ""]
+             "ANNAHMEN (nicht gemessen): `pipeline/config/params.json`. Buendelung, Schlenker, Ruhestein und Grinden ergeben sich aus der Suche, es gibt keine Gruppen oder Schwellen.",
+             f"Suchparameter: Strahlbreite {a.beam}, Zeit-Eimer {a.bucket:.0f} s. Zufall: {P['mc_runs']} Nachspielungen mit gewuerfelten Drops.",
+             f"Questlog-Plaetze: {w.slots}. Ruhestein-Heimat am Start: {'ja' if w.use_hearth else 'nein'}. Errands: {[e['id'] for e in w.errands] or 'keine'}.", ""]
     results = {}
     for label, single in (("frei (beliebig viele Quests offen)", False), ("Vergleich: immer nur eine Quest offen", True)):
-        end = plan(w, a.target_level, a.beam, a.bucket, single)
+        end = plan_refined(w, a.target_level, a.beam, a.bucket, single)
         results[label] = end
         if end is None:
             lines += [f"## {label}", "Kein Weg gefunden.", ""]
@@ -351,10 +499,16 @@ def main():
         steps = trace(end)
         mc = monte_carlo(w, end, a.target_level, P["mc_runs"])
         max_open = max(len(s.open) for s in steps)
-        acts = [f"| {s.t/60:.1f} | {s.level} | {len(s.open)} | {s.act} |" for s in steps[1:]]
+        modes = defaultdict(int)
+        kinds = defaultdict(int)
+        for s in steps[1:]:
+            modes[s.rec[6]] += 1
+            kinds[s.rec[0]] += 1
+        acts = [f"| {s.t/60:.1f} | {s.level} | {len(s.open)} | {s.act}{' [' + s.rec[6] + ']' if s.rec[6] != 'walk' else ''} |" for s in steps[1:]]
         lines += [f"## {label}",
                   f"Plan (Erwartungswerte): Level {a.target_level} nach **{end.t/60:.1f} min**, {len(end.done)} Quests abgegeben, "
                   f"bis zu {max_open} gleichzeitig offen, geteilte Kills: {end.shared}",
+                  f"Handlungen: {dict(kinds)}. Wegarten: {dict(modes)}",
                   f"Mit gewuerfelten Drops (gleicher Plan): Mittel {mc['mean']/60:.1f} min, Median {mc['median']/60:.1f} min, "
                   f"10 %-Quantil {mc['p10']/60:.1f} min, 90 %-Quantil {mc['p90']/60:.1f} min", "",
                   "| Min | Level | offen | Handlung |", "|---|---|---|---|", *acts, ""]
