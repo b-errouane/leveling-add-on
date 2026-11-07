@@ -36,6 +36,8 @@ Ergebnis einer ersten Websuche. Es wurden nur Suchergebnisse gelesen, keine Lize
 | **Client-Tabellen (DB2)** via [wago.tools](https://wago.tools) | Konstanten wie XP-Tabellen, ggf. Quest- und Kreaturendaten | wago.tools-Dateien/API, lokale Tools (z. B. wow.tools.local, WoWDBDefs) | Daten gehören Blizzard. robots.txt von wago.tools sperrt laut einem Projekt die CSV-Downloads, die API liefert Rohdateien. | Verlässlichste Quelle für feste Werte. Ob `QuestXP`/Kreaturentabellen in Forever vorliegen und was sie enthalten, ist offen. Rechtlich siehe unten. |
 | **Wowhead Forever** | umfangreiche Daten, auch Drop-Raten | nur Webseite, keine offizielle API gefunden | Nutzungsbedingungen **nicht gelesen**. Wowhead wehrt laut Forendiskussion Scraping ab. | Nicht automatisiert abziehen, bevor die Bedingungen geklärt sind. |
 
+**ForeverDB-Pflicht:** Überall, wo ForeverDB-Daten gesehen werden (Add-on, Dokumente, Berichte, Auszüge), muss https://foreverdb.net als Quelle genannt und verlinkt werden. Umsetzung in [08-datenpipeline.md](08-datenpipeline.md).
+
 ### Was daraus folgt
 
 - **Fest-Werte** (XP pro Level, Quest-XP-Skalierung, Kill-XP-Formel) sollten aus den Client-Tabellen kommen, nicht aus Fremdseiten.

@@ -31,6 +31,12 @@ Zielversion: **WoW Forever** (offizielle dritte WoW-Version seit 4.11.2026, Leve
 - Komplett KI-erstellt, datengetrieben
 - Guidelime ist auf Forever nutzbar (laut Nutzer), als **Navigationsanzeige** wird aber **TomTom (CrazyArrow)** bevorzugt
 
+## Pflicht: Quellenangabe für ForeverDB
+
+**Wann immer ForeverDB-Daten gesehen werden, muss https://foreverdb.net als Quelle genannt und verlinkt werden.** Das ist eine Bedingung der ForeverDB-API und gilt als feste Anforderung für das ganze Projekt. Umsetzung im Detail: [08-datenpipeline.md](08-datenpipeline.md), Abschnitt „Pflicht: Quellenangabe".
+
+Daten von ForeverDB: https://foreverdb.net
+
 ## Konventionen
 
 - Aussagen mit **(zu prüfen)** sind Annahmen aus dem Gedächtnis und noch nicht verifiziert.

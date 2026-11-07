@@ -4,6 +4,22 @@ Ziel: Aus öffentlichen Quellen automatisch ein kompaktes Daten-Paket für das A
 
 Annahmen: Projekt privat, GPL-3.0 akzeptiert (siehe [02-offene-fragen.md](02-offene-fragen.md)). Quellen und ihr Stand: [03-datenquellen.md](03-datenquellen.md).
 
+## Pflicht: Quellenangabe für ForeverDB
+
+**Bedingung der ForeverDB-API: Wann immer Daten von ForeverDB gesehen werden, muss https://foreverdb.net als Quelle genannt und verlinkt werden.** Das ist eine feste Anforderung und gilt für jede Stelle, an der Menschen die Daten sehen können. Sie ist keine Option und wird nicht vergessen, indem man sie nur an einer Stelle erfüllt.
+
+Konkret:
+
+1. **Herkunft pro Feld:** Stufe 2 speichert die Quelle jedes Feldes. Daten von ForeverDB tragen `source: foreverdb`. Dadurch wissen alle späteren Stufen, welche Daten die Angabe auslösen.
+2. **Ausgabe-Paket:** Die erzeugten Lua-Dateien und das Manifest enthalten die Quellenangabe (Text und Link foreverdb.net). Der Datenstand nennt ForeverDB als Quelle, sobald auch nur ein Feld von dort stammt.
+3. **Anzeige im Spiel:** Das Add-on zeigt die Quellenangabe sichtbar an, zum Beispiel in der Info-/Optionsansicht und am Ort, wo Daten dargestellt werden (Schrittanzeige, Tooltips, Erklärungen wie „Quest X, weil XP/h = …"). Die genaue Platzierung wird beim Bau festgelegt (siehe Meilenstein 4). Der Link steht als Text da, weil im Spiel kein klickbarer Link vorausgesetzt werden kann.
+4. **Dokumentation und Repo:** README und alle Dokumente, die ForeverDB-Daten wiedergeben, nennen die Quelle. Gleiches gilt für ausgegebene Berichte (`data/reports/`), Auszüge und Screenshots.
+5. **Auch bei Weitergabe:** Auszüge, Exporte oder Zusammenfassungen, die an andere gehen oder irgendwo gepostet werden, tragen die Angabe.
+6. **Automatische Prüfung:** Die Pipeline enthält einen Test, der fehlschlägt, wenn Daten mit `source: foreverdb` im Paket sind, aber die Quellenangabe im Manifest oder in den Anzeige-Texten fehlt.
+7. **Schutz vor Vermischung:** Sollen irgendwann Daten ohne ForeverDB-Anteil ausgegeben werden, entscheidet die Herkunft pro Feld, ob die Angabe nötig ist. Im Zweifel steht sie drin.
+
+Formulierungsvorschlag (anpassbar): „Quest- und Itemdaten: ForeverDB, https://foreverdb.net".
+
 ## Überblick
 
 ```
@@ -94,6 +110,7 @@ Die Schätzmodelle (3 und 4) sind bewusst einfach und über Parameter einstellba
 - **Lua-Datendateien** für das Add-on, **pro Zone oder Level-Band** aufgeteilt, damit nur das Nötige geladen wird.
 - Kompakte Struktur (numerische IDs, flache Tabellen, wenig Text). Namen wenn möglich aus dem Spiel selbst holen statt zu speichern.
 - `Manifest` mit Datenstand: Quellen, Versionen, Build-Nummer, Erzeugungsdatum, Prüfbericht-Zusammenfassung. Das Add-on kann den Datenstand anzeigen.
+- **Quellenangabe (Pflicht):** Manifest und Add-on-Texte enthalten „ForeverDB, https://foreverdb.net", sobald Daten von dort im Paket sind (siehe oben).
 - Größe prüfen: Ladezeit und Speicher im Spiel messen **(offen, siehe [06-datenmodell.md](06-datenmodell.md))**.
 
 ## Ordnerstruktur (Vorschlag)
@@ -132,7 +149,7 @@ leveling-add-on/
 | **1** | Normalisierung einer Zone | Zwischenformat steht, Prüfbericht für diese Zone |
 | **2** | Zusammenführen und Prüfen | Quellen gemischt, Widersprüche und Lücken berichtet |
 | **3** | Ableitung für Level 1–10 | XP, Dauer, Reisezeit, Überlappungsindex, Referenzplan für den ersten Abschnitt |
-| **4** | Ausgabe als Lua und Laden im Spiel | Add-on-Rohgerüst liest die Daten, zeigt den nächsten Schritt, TomTom-Pfeil gesetzt |
+| **4** | Ausgabe als Lua und Laden im Spiel | Add-on-Rohgerüst liest die Daten, zeigt den nächsten Schritt, TomTom-Pfeil gesetzt, **ForeverDB-Quellenangabe sichtbar im Add-on** |
 | **5** | Ausbau auf alle Zonen und Level 1–60 | Vollständiges Paket |
 
 Der erste echte Prüfstein ist **Meilenstein 4**: Erst dort zeigt sich im Spiel, ob die vorberechneten Daten tragen.

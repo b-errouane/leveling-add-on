@@ -41,6 +41,9 @@ Kernfrage: Müssen wir ein eigenes Add-on schreiben, oder können wir ein besteh
 - [ ] Ist das Auslesen der Client-Tabellen (DB2) erlaubt, und wie kommen wir sauber heran (wago.tools-API, lokale Tools)?
 - [ ] Ist Forever-Datenabdeckung für neue Quests in QuestieDB und ForeverDB ausreichend, oder braucht es eigene Datensammlung?
 - [ ] Hat ForeverDB einen Bulk-Zugang, welche Rate-Limits und Bedingungen gelten?
+- [x] **Pflicht: ForeverDB-Quellenangabe** (https://foreverdb.net) überall, wo die Daten gesehen werden. Ist in README, [03-datenquellen.md](03-datenquellen.md) und [08-datenpipeline.md](08-datenpipeline.md) festgehalten.
+- [ ] Wo genau zeigt das Add-on die Quellenangabe an (Info-Fenster, Schrittanzeige, Tooltip), und in welcher Form ohne klickbaren Link?
+- [ ] Gibt es weitere Vorgaben der ForeverDB-Bedingungen zur Darstellung der Angabe (Wortlaut, Position)? Die vollständigen API-Bedingungen wurden noch nicht gelesen.
 - [ ] Dürfen wir die Daten nutzen (Lizenz, Nutzungsbedingungen, Scraping erlaubt)? Gibt es offene Dumps?
 - [ ] Wie aktuell und wie korrekt sind die Daten? Besonders XP-Werte und Drop-Raten sind teils geschätzt oder stammen aus Community-Beobachtungen.
 - [ ] Wie gehen wir mit **Unsicherheit** um (Drop-Raten sind Stichproben, XP-Werte können sich pro Patch ändern)?
