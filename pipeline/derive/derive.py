@@ -18,6 +18,11 @@ NORM = ROOT / "data/normalized"
 OUT = ROOT / "data/derived"
 REPORTS = ROOT / "data/reports"
 P = json.load(open(ROOT / "pipeline/config/params.json", encoding="utf-8"))
+# Messwerte aus dem Spiel (pipeline/collected/calibrate.py) uebersteuern die Annahmen aus params.json.
+_CAL = ROOT / "pipeline/config/calibrated.json"
+if _CAL.exists():
+    with open(_CAL, encoding="utf-8") as _f:
+        P.update({k: v for k, v in json.load(_f).items() if not k.startswith("_")})
 
 
 MAX_COUNT = 40  # groessere Zahlen im Zieltext sind meist keine Stueckzahlen (Geld, Level, Jahre)
@@ -49,6 +54,12 @@ def mob_base_xp(player, mob):
           else 9 if player <= 19 else 11 if player <= 29 else 12 if player <= 39 else 13 if player <= 44
           else 14 if player <= 49 else 15 if player <= 54 else 16 if player <= 59 else 17)
     return base * (1 - (player - mob) / zd)
+
+
+def npc_level(npc, default):
+    """Mittleres Mob-Level. Fehlende Werte und der Platzhalter 9999 (Level unbekannt) ergeben `default`."""
+    vals = [v for v in (npc["min_level"], npc["max_level"]) if isinstance(v, int) and 0 < v <= 70]
+    return round(sum(vals) / len(vals)) if vals else default
 
 
 def centroid(points):
@@ -109,7 +120,7 @@ def kill_seconds(elite):
 
 
 def mob_gain(npc, level, count):
-    ml = round(((npc["min_level"] or level) + (npc["max_level"] or level)) / 2)
+    ml = npc_level(npc, level)
     elite = (npc["rank"] or 0) > 0
     return count * mob_base_xp(level, ml) * (P["elite_xp_multiplier"] if elite else 1.0), elite
 
@@ -163,12 +174,15 @@ def evaluate(q, npcs, objects, items, drops, table, est_tier, zone):
         srcs = [(npcs.get(str(x)), rates.get(str(x))) for x in it.get("npc_drops", [])]
         srcs = [(npc, r) for npc, r in srcs if npc and pts(npc, zone)]
         rated = [(npc, r) for npc, r in srcs if r]
+        # Dieselbe Quellenwahl wie in route.needs (der Planer): die Mob-Art mit der besten Drop-Rate, kein
+        # fester Schwellenwert. Frueher wurde hier die erste von mehreren "gut genug"-Quellen genommen,
+        # was zu anderen Mob-XP als im Planer fuehrte.
         if rated:
-            best = max(r for _, r in rated) / 100.0
-            use = [npc for npc, r in rated if r / 100.0 >= best * 0.5]
-            rate = best
+            best_npc, best_rate = max(rated, key=lambda x: x[1])
+            use = [best_npc]
+            rate = best_rate / 100.0
         elif srcs:
-            use = [npc for npc, _ in srcs]
+            use = [srcs[0][0]]
             rate = P["unknown_drop_rate"]
             conf.append("droprate geschaetzt")
         else:

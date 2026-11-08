@@ -18,6 +18,7 @@ Kleines Add-on, das den **nächsten Schritt** eines vorberechneten Leveling-Plan
 |---|---|
 | `/fl` | Befehle anzeigen und Anzeige aktualisieren |
 | `/fl list` | die nächsten Schritte im Chat |
+| `/fl plans` / `/fl use <name\|auto>` | Pläne anzeigen bzw. wählen |
 | `/fl why` | empfohlene Abfolge mit XP, Zeit und Rate; Vergleich mit dem Plan-Schritt |
 | `/fl plan` | zwischen Neubewertung und strikt nach Plan umschalten |
 | `/fl side` | Nebenbei-Quests (im Log lassen) und Quests, die am Planende offen bleiben |
@@ -29,6 +30,12 @@ Kleines Add-on, das den **nächsten Schritt** eines vorberechneten Leveling-Plan
 | `/fl lock` | Fenster fixieren / wieder verschiebbar machen |
 | `/fl reset` | alle Überspringungen löschen |
 | `/fl about` | Stand des Plans und Quellen |
+
+## Mehrere Pläne
+
+Es gibt pro Gebiet einen Plan (`Plans/<name>.lua`): `elwynn` (Northshire Valley und Elwynn Forest, Level 1–10) und `redridge` (Redridge Mountains / Rotkammgebirge, Level 16–20). Das Add-on wählt automatisch den Plan, dessen Level-Bereich zu deinem Level passt, und wechselt beim Levelaufstieg von selbst. Mit `/fl plans` siehst du die Pläne, mit `/fl use <name>` erzwingst du einen, mit `/fl use auto` gehst du zurück zur Automatik.
+
+Der Rotkammgebirge-Plan ist **klassenunabhängig** (klassengebundene Quests entfallen) und nimmt an, dass Vorquests außerhalb der Zone erledigt sind. Er beginnt in Lakeshire. Wo du tatsächlich stehst, berücksichtigt die Live-Neubewertung.
 
 ## Oberfläche
 

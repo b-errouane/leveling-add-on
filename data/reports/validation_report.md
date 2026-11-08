@@ -1,6 +1,6 @@
 # Qualitaetsbericht (Normalisierung und Pruefung)
 
-Erzeugt aus `data/normalized/` (Stand 2026-11-07).
+Erzeugt aus `data/normalized/` (Stand 2026-11-08).
 Quellen: Daten: QuestieDB (GPL-3.0), Wowhead-basierte Drop-Tabelle von Questie, Blizzard-Client-Tabellen via wago.tools. ForeverDB-Daten sind (noch) nicht enthalten.
 
 Quests 5233, NPCs 13417, Objekte 7045, Items 21442.

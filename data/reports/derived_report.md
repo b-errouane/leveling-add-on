@@ -26,7 +26,7 @@ Quests bewertet: 74
 | 3905 | Grape Manifest | 4 | 355 (b) | 0 | 0.0 | 67 | 35 | 36976 |  |
 | 91758 | Follow That Kobold! | 4 | 355 (g) | 0 | 0.0 | 82 | 37 | 34855 | quest-xp geschaetzt |
 | 87 | Goldtooth | 8 | 880 (b) | 120 | 1.4 | 474 | 109 | 32878 | mengen geraten |
-| 46 | Bounty on Murlocs | 10 | 840 (b) | 1716 | 18.0 | 338 | 289 | 31851 |  |
+| 46 | Bounty on Murlocs | 10 | 840 (b) | 1716 | 18.0 | 385 | 296 | 31119 |  |
 | 91733 | Downstream | 10 | 840 (g) | 0 | 0.0 | 386 | 104 | 29046 | mengen geraten, quest-xp geschaetzt |
 | 114 | The Escape | 7 | 790 (b) | 0 | 0.0 | 554 | 104 | 27321 |  |
 | 91746 | Elmpaw's Head | 12 | 910 (g) | 0 | 0.0 | 700 | 125 | 26208 | position unbekannt, quest-xp geschaetzt |
@@ -51,6 +51,6 @@ Quests bewertet: 74
 | 3904 | Milly's Harvest | 4 | 180 (b) | 0 | 0.0 | 495 | 160 | 4055 |  |
 | 59 | Cloth and Leather Armor | 10 | 210 (b) | 0 | 0.0 | 1298 | 210 | 3593 |  |
 | 3903 | Milly Osworth | 4 | 35 (b) | 0 | 0.0 | 121 | 42 | 2983 |  |
-| 91736 | Applejack Still | 1 | 80 (g) | 151 | 2.9 | 2149 | 366 | 2275 | droprate geschaetzt, mengen geraten, quest-xp geschaetzt |
+| 91736 | Applejack Still | 1 | 80 (g) | 151 | 2.9 | 1989 | 343 | 2426 | droprate geschaetzt, mengen geraten, quest-xp geschaetzt |
 
-XP/h: Median 14574, 90. Perzentil 32878, 10. Perzentil 4958
+XP/h: Median 13990, 90. Perzentil 32878, 10. Perzentil 4958

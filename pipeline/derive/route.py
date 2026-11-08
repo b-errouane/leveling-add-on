@@ -13,13 +13,21 @@ import math
 from collections import defaultdict
 from pathlib import Path
 
-from pipeline.derive.derive import (P, centroid, counts_from_text, kill_seconds, load, mob_base_xp, pts,
+from pipeline.derive.derive import (P, centroid, counts_from_text, kill_seconds, load, mob_base_xp, npc_level, pts,
                                     typical_tier, yards, UNKNOWN_TRAVEL_YARDS)
 
 ROOT = Path(__file__).resolve().parents[2]
 REPORTS = ROOT / "data/reports"
-ZONE = 12  # Koordinatenraum von Northshire (9) und Elwynn (12)
-ZONES = {9, 12}
+ZONE = 12            # Koordinatenrahmen (wird mit configure() gesetzt)
+ZONES = {9, 12}      # zone_or_sort der Quests im Pool
+OUTSIDE_DONE = False  # Vorquests ausserhalb des Pools gelten als erledigt
+POOL_IDS = set()
+
+
+def configure(world):
+    """Setzt die aktive Welt (siehe worlds.py)."""
+    global ZONE, ZONES, OUTSIDE_DONE
+    ZONE, ZONES, OUTSIDE_DONE = world["frame"], set(world["zones"]), world["outside_done"]
 
 
 def qxp_at(q, level, table, est_tier):
@@ -106,7 +114,7 @@ def bundle_eval(qs, need, level, cur, npcs, table, est_tier):
     for mob, k in merged.items():
         npc = npcs[str(mob)]
         elite = (npc["rank"] or 0) > 0
-        ml = round(((npc["min_level"] or level) + (npc["max_level"] or level)) / 2)
+        ml = npc_level(npc, level)
         mob_xp += k * mob_base_xp(level, ml) * (P["elite_xp_multiplier"] if elite else 1.0)
         kill_sec += k * kill_seconds(elite)
     g, a, e = centroid(givers), centroid(area), centroid(enders)
@@ -156,15 +164,22 @@ def best_bundle(cands, need, level, cur, npcs, table, est_tier, allow_bundle):
     return best[0], best[1]
 
 
+def _prereq_ok(p, done):
+    """Eine Vorquest gilt als erledigt, wenn sie abgegeben wurde oder (fuer spaetere Zonen) ausserhalb des Pools liegt."""
+    return p in done or (OUTSIDE_DONE and p not in POOL_IDS)
+
+
 def available(q, done, level, race_bit):
     if q["placeholder"] or q["id"] in done or (q["required_level"] or 1) > level:
         return False
+    if q["required_classes"]:
+        return False  # der Plan ist klassenunabhaengig: klassengebundene Quests entfallen
     mask = q["required_races"]
     if mask and not (mask & race_bit):
         return False
-    if q["prequest_group"] and not all(p in done for p in q["prequest_group"]):
+    if q["prequest_group"] and not all(_prereq_ok(p, done) for p in q["prequest_group"]):
         return False
-    if q["prequest_single"] and not any(p in done for p in q["prequest_single"]):
+    if q["prequest_single"] and not any(_prereq_ok(p, done) for p in q["prequest_single"]):
         return False
     if any(x in done for x in q["exclusive_to"]):
         return False

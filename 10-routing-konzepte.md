@@ -86,7 +86,7 @@ Lehrer, Händler (Verkaufen, Reparieren, Nahrung und Wasser), Taschenplatz und �
 | Baustein | Stand |
 |---|---|
 | Zustand mit Ressourcen: Questlog-Plätze (Parameter `quest_log_slots`, Annahme 20), Heimat und Abklingzeit des Ruhesteins, bekannte Flugpunkte, erlernte Fähigkeitsstufen | umgesetzt |
-| Wegenetz: zu Fuß, Ruhestein, Flug; je Ziel der schnellste Weg im aktuellen Zustand | umgesetzt. Die Heimat ist am Start **nicht** gesetzt (Nutzer), der Plan wählt „Heimat setzen" selbst und nutzt den Ruhestein erst danach. Flüge sind mit künstlichen Daten getestet, in den echten Daten gibt es für diese Zonen keine nutzbaren Flugverbindungen (Goldshire hat laut Nutzer keinen Flugpunkt, ein Questie-Eintrag „Erma" als Flugmeister dort ist wohl fehlerhaft) |
+| Wegenetz: zu Fuß, Ruhestein, Flug; je Ziel der schnellste Weg im aktuellen Zustand | umgesetzt. Die Heimat ist am Start **nicht** gesetzt (Nutzer), der Plan wählt „Heimat setzen" selbst und nutzt den Ruhestein erst danach. Flüge sind mit künstlichen Daten getestet, in den echten Daten gibt es für diese Zonen keine nutzbaren Flugverbindungen (Goldshire hat laut Nutzer keinen Flugpunkt; „Erma" dort ist ein Stallmeister, kein Flugmeister) |
 | Gleicher Level und gleiche Quests, aber anderer Flugpunkt-Zustand → anderer Weg | umgesetzt und getestet |
 | Grind-Handlung (Mobs ohne offenen Questbedarf) | umgesetzt |
 | „Heimat setzen" und „Flugpunkt entdecken" als Gelegenheiten | umgesetzt (Gastwirt-Erkennung am Namen). Flugpunkt-Entdecken nur im Test, keine echten Daten |
@@ -102,7 +102,7 @@ Lehrer, Händler (Verkaufen, Reparieren, Nahrung und Wasser), Taschenplatz und �
 | 20 | 100 min | 13 | sehr viele kleine Portionen |
 | 30 | 124 min | 33 | 1 |
 
-Die Kill-Zeit ist bisher eine **Annahme** (12 s) und für deinen übermächtigen Charakter nicht messbar. Sie ist der wichtigste Parameter zum Kalibrieren. Ohne Messwert ist die Aussage „Quests vs. Grinden" nicht belastbar.
+Die Kill-Zeit ist bisher eine **Annahme** (12 s) und im Startgebiet mit dem übermächtigen Charakter des Nutzers nicht messbar; im Rotkammgebirge ist er laut Nutzer „ziemlich normal", dort sind Messungen repräsentativ. Sie ist der wichtigste Parameter zum Kalibrieren. Ohne Messwert ist die Aussage „Quests vs. Grinden" nicht belastbar.
 
 ## Folgerungen für die Reihenfolge der Arbeit
 

@@ -44,7 +44,7 @@ Was sich daraus offline ableiten lässt:
 |---|---|
 | Position + Geschwindigkeit (alle 2 s) | tatsächliche Lauf- und Reittempo, Kartenmaßstab (Strecke aus Tempo × Zeit gegen Karten-Prozent), Anteil der Zeit ohne Bewegung |
 | Kills mit XP, Spielerlevel, Mob-Level | Prüfung der Kill-XP-Formel (Level-Abhängigkeit) |
-| Kampfdauer und Abstand zwischen Kills | Zeitanteile für Kampf, Wege und Pausen (bei einem übermächtigen Charakter nur eingeschränkt aussagekräftig) |
+| Kampfdauer und Abstand zwischen Kills | Zeitanteile für Kampf, Wege und Pausen (in Zonen, in denen der Charakter normal stark ist, repräsentativ; im Startgebiet war der Schurke des Nutzers übermächtig, dort zu schnell) |
 | XP-Bedarf pro Level (automatisch bei Level-Ups und Login) | XP-Kurve ohne Chat-Befehl |
 | Quest-XP aus Dialogen, die du ohnehin öffnest | Stichproben zum Abgleich mit den Classic-Werten |
 | Looten | grobe Drop-Stichproben |

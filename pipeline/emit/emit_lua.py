@@ -1,7 +1,7 @@
 """Stufe 6: Ausgeben. Erzeugt die Lua-Plandatei fuer das Add-on aus dem Plan des Routenplaners.
 
-Ausgabe: addon/ForeverLeveler/Plan.lua (Tabelle ForeverLevelerPlan) und data/reports/plan_emit.md.
-Aufruf: python -m pipeline.emit.emit_lua [--target-level 10] [--beam 150]
+Ausgabe: addon/ForeverLeveler/Plans/<welt>.lua (Eintrag in ForeverLevelerPlans) und data/reports/plan_emit_<welt>.md.
+Aufruf: python -m pipeline.emit.emit_lua [--world elwynn|redridge] [--target-level N] [--beam 150]
 
 Hinweis zur Sicherheit: Alle Texte stammen aus Fremddaten und werden vollstaendig als Lua-Strings
 maskiert (Anfuehrungszeichen, Backslash, Steuerzeichen), damit die erzeugte Datei nur Daten enthaelt.
@@ -10,14 +10,15 @@ import argparse
 import datetime
 from pathlib import Path
 
-from pipeline.derive.derive import P, load, yards
+from pipeline.derive.derive import P, load, npc_level, yards
+from pipeline.derive import route
 from pipeline.derive.planner import ACCEPT_S, EPS, TURNIN_S, World, plan_refined, trace
 from pipeline.derive.route import qxp_at
+from pipeline.derive.worlds import WORLDS
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / "addon/ForeverLeveler/Plan.lua"
-MAP_ID = 1429  # UiMap Elwynn Forest (Forever-Build 1.60.1.70862, UiMapAssignment)
-ZONE = 12
+OUT_DIR = ROOT / "addon/ForeverLeveler/Plans"
+MAP_ID = 1429  # wird in main() aus der Welt gesetzt (UiMap, Forever-Build 1.60.1.70862, UiMapAssignment)
 
 
 def lua_str(s):
@@ -112,8 +113,8 @@ def build_steps(w, end, objects):
             # Keine Schwelle: der Wert wird immer angegeben, der Spieler sieht, wie gross der Umweg ist.
             if idx + 1 < len(states):
                 nxt = states[idx + 1].pos
-                direct = yards(parent.pos, nxt, ZONE) or 0.0
-                via = (yards(parent.pos, entry, ZONE) or 0.0) + (yards(entry, nxt, ZONE) or 0.0)
+                direct = yards(parent.pos, nxt, route.ZONE) or 0.0
+                via = (yards(parent.pos, entry, route.ZONE) or 0.0) + (yards(entry, nxt, route.ZONE) or 0.0)
                 e["detour"] = round(max(0.0, via - direct))
         steps.append(e)
     # Aufeinanderfolgende Grind-Schritte desselben Mobs zu einem Schritt zusammenfassen (die Suche zerlegt
@@ -174,7 +175,7 @@ def enrich_for_reevaluation(w, steps, end):
             deps = [accept_at.get(s["quest"])]
         elif t in ("kill", "grind"):
             npc = w.npcs[str(s["mob"])]
-            s["mobLevel"] = round(((npc["min_level"] or 1) + (npc["max_level"] or 1)) / 2)
+            s["mobLevel"] = npc_level(npc, s["level"])
             s["elite"] = (npc["rank"] or 0) > 0
             s["work"] = round(w.kill_work(s["mob"], s["count"]), 1)
             deps = [accept_at.get(q) for q in s.get("forQuests", [])]
@@ -199,37 +200,47 @@ def enrich_for_reevaluation(w, steps, end):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--target-level", type=int, default=10)
+    ap.add_argument("--world", default="elwynn", choices=sorted(WORLDS))
+    ap.add_argument("--target-level", type=int, default=None)
     ap.add_argument("--beam", type=int, default=150)
     ap.add_argument("--bucket", type=float, default=20.0)
     a = ap.parse_args()
+    global MAP_ID
+    cfg = WORLDS[a.world]
+    MAP_ID = cfg["uimap"]
+    target = a.target_level or cfg["target_level"]
     objects = load("objects.json")
     w = World(load("quests.json"), load("npcs.json"), objects, load("items.json"),
-              load("drops.json"), load("quest_xp_table.json"), 1)
-    end = plan_refined(w, a.target_level, a.beam, a.bucket, single=False)
+              load("drops.json"), load("quest_xp_table.json"), 1, a.world)
+    end = plan_refined(w, target, a.beam, a.bucket, single=False)
     if end is None:
         raise SystemExit("Kein Plan gefunden")
     steps = build_steps(w, end, objects)
     params = enrich_for_reevaluation(w, steps, end)
     meta = {
+        "name": a.world, "title": cfg["title"], "uiMap": cfg["uimap"],
+        "startLevel": cfg["start_level"], "targetLevel": target,
         "params": params,
         "generated": datetime.date.today().isoformat(),
-        "race": "Human", "targetLevel": a.target_level, "plannedMinutes": round(end.t / 60, 1),
-        "note": "Prototyp-Plan mit geratenen Zeitwerten, nicht kalibriert. Nur Northshire Valley und Elwynn Forest.",
+        "race": "Human", "plannedMinutes": round(end.t / 60, 1),
+        "note": "Prototyp-Plan mit geratenen Zeitwerten, nicht kalibriert. " + cfg["title"] + ", klassenunabhaengig.",
         "sources": "QuestieDB (GPL-3.0), Questie-Support-Tabellen, Blizzard-Client-Tabellen via wago.tools. Keine ForeverDB-Daten enthalten.",
     }
     # Quests, die am Ende des Plans noch offen sind, bleiben als Hintergrund-Quests im Log.
     meta["background"] = [{"quest": qid, "name": w.q[qid]["name"]} for qid in sorted(end.open)]
     meta["sideQuests"] = [{"quest": s["quest"], "name": s["name"]} for s in steps if s.get("side")]
     body = lua_val({"meta": meta, "steps": steps})
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text("-- AUTO-GENERATED by pipeline/emit/emit_lua.py. Do not edit.\nForeverLevelerPlan = " + body + "\n", encoding="utf-8")
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out = OUT_DIR / f"{a.world}.lua"
+    header = "-- AUTO-GENERATED by pipeline/emit/emit_lua.py. Do not edit.\nForeverLevelerPlans = ForeverLevelerPlans or {}\n"
+    out.write_text(header + f"ForeverLevelerPlans[{lua_str(a.world)}] = " + body + "\n", encoding="utf-8")
     kinds = {}
     for s in steps:
         kinds[s["type"]] = kinds.get(s["type"], 0) + 1
-    report = (f"# Plan-Ausgabe\n\nErzeugt: {meta['generated']}. Schritte: {len(steps)} ({kinds}). Geplante Zeit: {meta['plannedMinutes']} min bis Level {a.target_level}.\n"
-              f"Datei: `addon/ForeverLeveler/Plan.lua` ({OUT.stat().st_size} Bytes).\n")
-    (ROOT / "data/reports/plan_emit.md").write_text(report, encoding="utf-8")
+    report = (f"# Plan-Ausgabe ({a.world})\n\nErzeugt: {meta['generated']}. Schritte: {len(steps)} ({kinds}). "
+              f"Geplante Zeit: {meta['plannedMinutes']} min, Level {cfg['start_level']} bis {target}.\n"
+              f"Datei: `addon/ForeverLeveler/Plans/{a.world}.lua` ({out.stat().st_size} Bytes).\n")
+    (ROOT / f"data/reports/plan_emit_{a.world}.md").write_text(report, encoding="utf-8")
     print(report)
 
 

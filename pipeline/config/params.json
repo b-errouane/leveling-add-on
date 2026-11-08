@@ -4,6 +4,7 @@
   "zone_size_yards": {
     "_hinweis": "Karte [Breite, Hoehe] in Yards, abgeleitet aus UiMapAssignment (wago.tools, Forever-Build 1.60.1.70862, UiMap 1429 Elwynn Forest). Breite = Welt-Y-Bereich, Hoehe = Welt-X-Bereich.",
     "12": [3470.83, 2314.58],
+    "44": [2170.83, 1447.92],
     "default": [3470.83, 2314.58]
   },
   "seconds_per_kill": 12.0,
@@ -31,7 +32,9 @@
   "xp_to_next_level": {
     "_hinweis": "1->2 bis 12->13. Gesichert: 1->2 = 400, 16->17 = 16000 (Messung), Summe bis Level 10 = 27600 (Fanseiten). Rest aus dem Gedaechtnis.",
     "1": 400, "2": 900, "3": 1400, "4": 2100, "5": 2800, "6": 3600, "7": 4500, "8": 5400, "9": 6500,
-    "10": 7600, "11": 8800, "12": 10100
+    "10": 7600, "11": 8800, "12": 10100,
+    "13": 11400, "14": 12900, "15": 14400, "16": 16000, "17": 17700, "18": 19400, "19": 21300, "20": 23200,
+    "_hinweis2": "13-20 aus dem Gedaechtnis. Gesichert: 16->17 = 16000 (Messung) und die Summe der Stufen 10-19 = 139600, wie die Fanseiten fuer das Band 10-20 angeben. Der Einzelwert 20->21 ist ungeprueft."
   },
   "quest_xp_factor_by_level_diff": {
     "_hinweis": "ANNAHME: Spielerlevel minus Quest-Level -> Anteil der Quest-XP. Nicht gemessen.",

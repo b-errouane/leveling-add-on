@@ -230,7 +230,7 @@ Die bisher geratene Zonenbreite (1.800 yd, quadratisch) ist durch Werte aus der 
 
 **Auswirkung:** Die Wege sind länger als vorher angenommen. Level 10 ist im Plan nach **80 min** erreicht (frei) bzw. 89 min (immer nur eine Quest offen), der Vorteil durch parallele Quests beträgt rund 10 %. Der Median der Einzelquest-Bewertung sinkt auf rund 14.600 XP/h.
 
-**Kill-Zeit:** Die Kill-Zeit (12 s pro Mob) bleibt eine Annahme. Eine Messung mit dem derzeitigen, übermächtigen Charakter ist nicht aussagekräftig. Möglichkeit: später mit einem neuen Charakter oder aus Daten, die das Hilfs-Add-on mitschreibt.
+**Kill-Zeit:** Die Kill-Zeit (12 s pro Mob) bleibt eine Annahme. Der Charakter des Nutzers (Schurke, Mensch) war im Startgebiet übermächtig, im Rotkammgebirge (Level 16) ist er laut Nutzer „ziemlich normal". Messungen dort gelten daher als repräsentativ. Die Daten kommen aus dem Hilfs-Add-on.
 
 ## Meilenstein 3 (Prototyp, Teil 4): Spieler-Simulation mit Spawns, Kills unterwegs und Zufall
 
@@ -268,9 +268,9 @@ Der Vorteil durch paralleles Arbeiten an Quests ist mit 3 % klein (vorher 14–1
 
 **Korrektur (Nutzer, 8.11.2026):** Eine erste Fassung ging davon aus, dass der Ruhestein am Start schon an den Gastwirt in Goldshire gebunden ist, und nutzte ihn sofort. Das ist laut Nutzer falsch, die Heimat ist am Start nicht gesetzt. Jetzt startet der Spieler ohne Heimat (`initial_home_npc: null`), und der Plan muss „Heimat setzen" selbst wählen. Er tut das in Goldshire und nutzt den Ruhestein erst danach (Test `test_hearth_needs_a_home_to_be_set_first`).
 
-**Datenhinweis (Nutzer, 8.11.2026):** Goldshire hat weder in Classic noch in Forever einen Flugpunkt. Der Eintrag „Erma" (NPC 6749, Flugmeister-Flag, Level 29) mit Position in Goldshire in den Questie-Daten ist daher vermutlich fehlerhaft oder falsch platziert. Er geht nicht in den Plan ein (die Flugpunkte des Planers sind leer), sollte aber bei der Datenprüfung auffallen: Flugmeister-NPC in einer Zone ohne passenden `TaxiNodes`-Eintrag.
+**Datenhinweis (Nutzer, 8.11.2026), später korrigiert:** Goldshire hat weder in Classic noch in Forever einen Flugpunkt. Ich hatte „Erma" (NPC 6749, Flag 8193) deshalb zunächst für einen fehlerhaften Flugmeister-Eintrag gehalten. **Das war falsch:** In Questies Kodierung bedeutet das Flag 8192 **Stallmeister** (Erma ist der Stallmeister von Goldshire, ebenso Penny in Lakeshire). Flugmeister tragen Bit 8 (Flag 11). Die Datenprüfung (`pipeline/validate/hygiene.py`) erkennt Flugmeister jetzt daran und findet bei allen 64 geprüften Flugmeistern einen passenden Flugpunkt.
 
-**Das Ergebnis ist stark von der Kill-Zeit abhängig** (siehe Tabelle in 10-routing-konzepte.md): Bei 12 s pro Kill lohnt sich Grinden, bei 30 s sind Quests deutlich besser. Die Kill-Zeit ist ungemessen und für den derzeitigen Charakter nicht messbar. Das Sammel-Add-on soll sie später aus Spielen mit einem niedrigstufigen Charakter liefern.
+**Das Ergebnis ist stark von der Kill-Zeit abhängig** (siehe Tabelle in 10-routing-konzepte.md): Bei 12 s pro Kill lohnt sich Grinden, bei 30 s sind Quests deutlich besser. Die Kill-Zeit ist ungemessen. Sie wird aus Kills im Rotkammgebirge (Level 16, dort laut Nutzer „ziemlich normal") mit dem Sammel-Add-on bestimmt; im Startgebiet war der Charakter übermächtig, dort wären Messwerte zu schnell.
 
 ## Erste Sammeldaten aus dem Spiel (8.11.2026)
 
@@ -288,6 +288,31 @@ Das Sammel-Add-on (Version 0.1.1) läuft im Forever-Client und hat beim `/reload
 | Kills | 0 | Fehler im Erfassen: auf Level 16 geben graue Mobs keine XP, und Version 0.1.1 erkannte Kills nur über die XP-Meldung. Version 0.1.2 erfasst Kills über das Kampflog (NPC-ID, Kampfdauer, auch bei 0 XP) |
 
 Die Quest-Namen kommen auf Deutsch (deutscher Client), die Quest-IDs sind sprachunabhängig. Der Abgleich läuft deshalb über die IDs.
+
+## Daten-Hygiene, Hilfscode und Rotkammgebirge (8.11.2026)
+
+**Daten-Hygiene** (`python -m pipeline.validate.hygiene`, Bericht `data/reports/hygiene_report.md`, Liste `data/normalized/suspects.json`):
+
+- **Korrektur einer eigenen Falschaussage:** Das NPC-Flag 8192 ist in Questies Kodierung **Stallmeister**, nicht Flugmeister (Flugmeister tragen Bit 8, Flag 11). „Erma" in Goldshire und „Penny" in Lakeshire sind Stallmeister. Meine frühere Annahme, ein Eintrag sei fehlerhaft, war falsch. Mit der richtigen Erkennung passen alle 64 geprüften Flugmeister zu einem Flugpunkt.
+- **Platzhalter-Level 9999:** 37 NPCs haben Level 9999 (Level unbekannt, überwiegend neue Forever-NPCs). Ein Hilfsmittel `npc_level()` ersetzt solche Werte durch das Level der Quest, damit die Kill-XP nicht verfälscht werden.
+- **Positions-Platzhalter (-1, -1):** 1.727 Positionen (Instanzen oder unbekannt), werden gesondert gezählt. Ansonsten gibt es keine Koordinaten außerhalb des Kartenrahmens.
+- **67 Flugpunkte ohne markierten Flugmeister** in der Nähe: Für die Planung unkritisch, aber ein Hinweis auf Lücken bei den Flugmeistern in den Daten.
+- **32 Quests mit Mindestlevel über dem Questlevel** (wie schon bekannt, überwiegend Klassenquests).
+
+**Hilfscode:** Die Einzelquest-Bewertung (`derive.py`) wählte bei Item-Zielen die erste von mehreren „gut genug"-Quellen und hatte dafür einen festen Schwellenwert (halbe beste Rate). Das war nicht mit dem Planer vereinbar (z. B. 818 statt 649 Mob-XP bei „Wolves Across the Border"). Jetzt gilt in beiden Wegen dieselbe Regel (Quelle mit der besten Drop-Rate), abgesichert durch `pipeline/tests/test_derive_consistency.py`.
+
+**Rotkammgebirge (Redridge Mountains, Level 16 → 20):** Der Planer ist jetzt mit Welt-Konfigurationen (`pipeline/derive/worlds.py`) zonenfähig. Neu für spätere Zonen: Vorquests außerhalb der Zone gelten als erledigt, klassengebundene Quests entfallen, eigener Start-Level und -Ort. Die XP-Tabelle ist bis Level 20 belegt (Summen 1–9 = 27.600 und 10–19 = 139.600 passen zu den Fanseiten). Kartengröße 2.170,8 × 1.447,9 yd aus den Client-Tabellen.
+
+| Sekunden pro Kill | Level 20 nach | Quests abgegeben | Grinden (Zeit / XP) |
+|---|---|---|---|
+| 12 (Annahme) | 105 min | 8 | 80 % / 81 % |
+| 25 | 177 min | 14 | – |
+| 40 | 231 min | 22 | – |
+| 60 | 395 min | 23 | – |
+
+Es gibt 42 Quests mit Mindestlevel ≤ 20, davon sind 18 an Vorquests gebunden. Bei der angenommenen Kill-Zeit zieht der Planer das Grinden fast allen Quests vor, weil ein gleichwertiger Mob rund 130 XP in 12 s bringt (etwa 39.000 XP/h). Die Zahl der Grind-**Schritte** ist nur die Portionierung der Suche, aussagekräftig sind die Anteile. **Das Verhältnis Quests/Grinden ist rein von der Kill-Zeit bestimmt und damit unbelegt.**
+
+**Kalibrierung aus Spieldaten:** `python -m pipeline.collected.calibrate [--write]` leitet aus den Sammeldaten die tatsächliche Zeit pro Kill ab (Median des Abstands zwischen Kills mit XP, inklusive Laufen, Looten, Pausen), prüft die Kill-XP-Formel gegen beobachtete XP und schreibt auf Wunsch `pipeline/config/calibrated.json`, das die Annahmen aus `params.json` übersteuert. Bisher gibt es dafür noch zu wenige Kills (die Datei stammt aus Version 0.1.1 des Sammel-Add-ons, die Kills nur über die XP-Meldung erkannte, und der Charakter hat graue Mobs getötet).
 
 ## Noch offen
 

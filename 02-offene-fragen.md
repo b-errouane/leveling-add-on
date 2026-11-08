@@ -68,6 +68,13 @@ Kernfrage: Müssen wir ein eigenes Add-on schreiben, oder können wir ein besteh
 - [ ] Welche Wegverbindungen fehlen in unseren Daten (Schiffe, Zeppeline, Portale, Ruhestein-Ziele)?
 - [ ] Alltags-Stopps (Lehrer, Händler, Reparatur, Taschen) als Gelegenheiten mit Nutzen-Funktion: Welche Daten brauchen wir (Händlerliste, Preise, Haltbarkeit)?
 
+## Ein Datenpool statt mehrerer Pläne (Nutzer, 8.11.2026)
+
+- [x] **Anforderung:** Es soll nichts umgeschaltet werden müssen. Rotkammgebirge und alle weiteren Gebiete gehören in **einen gemeinsamen Datenpool**; das Add-on zeigt automatisch die Quests, die zu Level, Position und Questlog passen. Die aktuelle Umschaltung zwischen `elwynn` und `redridge` ist nur ein Übergang.
+- [ ] Gemeinsame Weltkoordinaten (Yards) für alle Zonen aus `UiMapAssignment`, Wege zwischen Zonen (Flugpunkte, Ruhestein) im selben Netz.
+- [ ] Add-on-Datenformat: Pool mit Quest-Vorlagen (Ort, XP, Arbeitszeit, Abhängigkeiten) statt fester Schrittliste; Live-Neubewertung wählt aus allen verfügbaren Quests.
+- [ ] Kandidatenauswahl für die Vorausschau bei großem Pool (Suchhilfe, keine Spielregel) und Mob-Spawns für das Grinden im Pool.
+
 ## Technik und Betrieb
 
 - [ ] Wie wird das Add-on verteilt (CurseForge, GitHub, nur privat)?

@@ -38,7 +38,8 @@ TomTom = {
 }
 SlashCmdList = {}
 
-dofile("addon/ForeverLeveler/Plan.lua")
+dofile("addon/ForeverLeveler/Plans/elwynn.lua")
+dofile("addon/ForeverLeveler/Plans/redridge.lua")
 dofile("addon/ForeverLeveler/Reeval.lua")
 dofile("addon/ForeverLeveler/ForeverLeveler.lua")
 
@@ -48,7 +49,8 @@ local function head() return texts[2] and texts[2]._text end   -- lineMain
 fire("ADDON_LOADED", "ForeverLeveler")
 assert(ForeverLevelerDB, "SavedVariables table not created")
 fire("PLAYER_ENTERING_WORLD")
-local first = ForeverLevelerPlan.steps[1]
+local ElwynnPlan = ForeverLevelerPlans.elwynn
+local first = ElwynnPlan.steps[1]
 print("Step 1 expected:", first.type, first.name)
 print("Display:", head())
 assert(head() and head():find(first.name, 1, true), "first step not shown")
@@ -58,19 +60,19 @@ assert(#waypoints >= 1 and waypoints[#waypoints].map == first.map, "TomTom waypo
 state.onQuest[first.quest] = true
 fire("QUEST_ACCEPTED", 1, first.quest)
 print("After accepting:", head())
-local second = ForeverLevelerPlan.steps[2]
+local second = ElwynnPlan.steps[2]
 assert(head():find(second.name, 1, true) or second.type ~= "accept" or true)
 
 -- all quests done but the level is below the plan: optional grind steps must still be shown
-for _, s in ipairs(ForeverLevelerPlan.steps) do if s.quest then state.done[s.quest] = true end end
+for _, s in ipairs(ElwynnPlan.steps) do if s.quest then state.done[s.quest] = true end end
 fire("QUEST_LOG_UPDATE")
 print("All quests done, level 1:", head())
 local hasGrind = false
-for _, s in ipairs(ForeverLevelerPlan.steps) do if s.type == "grind" then hasGrind = true end end
+for _, s in ipairs(ElwynnPlan.steps) do if s.type == "grind" then hasGrind = true end end
 if hasGrind then assert(head():find("Grinden", 1, true), "grind step should be shown while level is below plan") end
 
 -- reaching the target level finishes the plan (optional steps no longer block)
-state.level = ForeverLevelerPlan.meta.targetLevel
+state.level = ElwynnPlan.meta.targetLevel
 fire("PLAYER_LEVEL_UP")
 print("All quests done, target level:", head())
 assert(head():find("abgeschlossen", 1, true), "plan should be finished")
@@ -82,4 +84,17 @@ for k in pairs(state.onQuest) do state.onQuest[k] = nil end
 fire("QUEST_LOG_UPDATE")
 SlashCmdList["FL"]("skip")
 print("After skip:", head())
+-- plan switching: reaching the start level of the Redridge plan switches to it automatically
+for k in pairs(state.done) do state.done[k] = nil end
+for k in pairs(state.onQuest) do state.onQuest[k] = nil end
+local RedridgePlan = ForeverLevelerPlans.redridge
+state.level = RedridgePlan.meta.startLevel
+fire("PLAYER_LEVEL_UP")
+local redFirst = RedridgePlan.steps[1]
+print("After level-up to", state.level, ":", head())
+assert(head() and (head():find(redFirst.name or redFirst.mobName or "", 1, true)), "should show the Redridge plan")
+SlashCmdList["FL"]("use elwynn")
+state.level = 1
+fire("PLAYER_LEVEL_UP")
+SlashCmdList["FL"]("use auto")
 print("OK")

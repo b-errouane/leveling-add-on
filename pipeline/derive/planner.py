@@ -22,8 +22,10 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 
-from pipeline.derive.derive import P, centroid, kill_seconds, load, mob_base_xp, pts, typical_tier, yards
-from pipeline.derive.route import ZONE, ZONES, available, needs, qxp_at
+from pipeline.derive.derive import P, centroid, kill_seconds, load, mob_base_xp, npc_level, pts, typical_tier, yards
+from pipeline.derive import route
+from pipeline.derive.route import available, needs, qxp_at
+from pipeline.derive.worlds import WORLDS
 
 ROOT = Path(__file__).resolve().parents[2]
 REPORTS = ROOT / "data/reports"
@@ -56,40 +58,47 @@ def _seg_dist(p, a, b, sx, sy):
 
 
 class World:
-    def __init__(self, quests, npcs, objects, items, drops, table, race_bit):
+    def __init__(self, quests, npcs, objects, items, drops, table, race_bit, world="elwynn"):
+        self.world_name = world
+        cfg = WORLDS[world] if isinstance(world, str) else world
+        self.cfg = cfg
+        route.configure(cfg)
         self.npcs, self.table, self.race_bit = npcs, table, race_bit
         self.est_tier = typical_tier(quests, table)
-        pool = [q for q in quests.values() if q["zone_or_sort"] in ZONES and not q["placeholder"]]
+        pool = [q for q in quests.values() if q["zone_or_sort"] in route.ZONES and not q["placeholder"]]
         self.need = {q["id"]: needs(q, npcs, objects, items, drops) for q in pool}
         self.pool = [q for q in pool if self.need[q["id"]]["giver"] is not None
                      and (q["started_by"]["npc"] or q["started_by"]["object"])]
         self.q = {q["id"]: q for q in self.pool}
-        self.scale = tuple(P["zone_size_yards"].get(str(ZONE), P["zone_size_yards"]["default"]))
+        route.POOL_IDS = {q["id"] for q in pool}
+        self.scale = tuple(P["zone_size_yards"].get(str(route.ZONE), P["zone_size_yards"]["default"]))
         self.spawns, self.mob_pos, self.nn = {}, {}, {}
         for n in self.need.values():
             for m in n["kills"]:
                 if m in self.spawns:
                     continue
-                sp = pts(npcs[str(m)], ZONE)
+                sp = pts(npcs[str(m)], route.ZONE)
                 self.spawns[m] = sp
                 self.mob_pos[m] = centroid(sp)
                 if len(sp) > 1:
-                    d = [min(yards(a, b, ZONE) for b in sp if b is not a) for a in sp]
+                    d = [min(yards(a, b, route.ZONE) for b in sp if b is not a) for a in sp]
                     self.nn[m] = sum(d) / len(d)
                 else:
                     self.nn[m] = 0.0
         self.need_xp = {int(k): v for k, v in P["xp_to_next_level"].items() if k.isdigit()}
-        self.start = centroid(pts(npcs["197"], ZONE))  # Marshal McBride
+        self.start = centroid(pts(npcs[str(cfg["start_npc"])], route.ZONE))
+        self.start_level, self.start_xp = cfg["start_level"], cfg["start_xp"]
         self._hits = {}
         self.excluded = set()  # Quests, die der Plan angenommen, aber nie abgegeben hat (Bereinigung)
         # Ressourcen und Wegenetz
         self.slots = int(P["quest_log_slots"])
         self.inns = {}
         for n in npcs.values():
-            if n["name"].startswith("Innkeeper") and pts(n, ZONE):
-                self.inns[n["id"]] = centroid(pts(n, ZONE))
+            if n["name"].startswith("Innkeeper") and pts(n, route.ZONE):
+                self.inns[n["id"]] = centroid(pts(n, route.ZONE))
         # Heimat am Start: standardmaessig nicht gesetzt. Der Plan muss "Heimat setzen" selbst waehlen.
-        self.home0 = self.inns.get(P["initial_home_npc"]) if P.get("initial_home_npc") else None
+        home_npc = cfg.get("home_npc") or P.get("initial_home_npc")
+        self.home0 = self.inns.get(home_npc) if home_npc else None
         self.use_hearth = bool(self.inns)
         self.fl_nodes, self.fl_edges = {}, {}  # {id: pos}, {(a, b): Sekunden}; in dieser Zone leer (siehe Doku)
         self.grind_mobs = [m for m in self.spawns if (npcs[str(m)]["rank"] or 0) == 0 and self.spawns[m]]
@@ -99,8 +108,8 @@ class World:
         for n in npcs.values():
             sub = n.get("sub_name") or ""
             cls = sub[:-len(" Trainer")] if sub.endswith(" Trainer") else None
-            if cls in CLASS_NAMES and pts(n, ZONE):
-                self.class_trainers[cls].append(centroid(pts(n, ZONE)))
+            if cls in CLASS_NAMES and pts(n, route.ZONE):
+                self.class_trainers[cls].append(centroid(pts(n, route.ZONE)))
         self.errands = []
         for e in P.get("errands", []):
             if e.get("class_trainers"):
@@ -109,18 +118,18 @@ class World:
                     self.errands.append({**e, "pos": centroid(allpos), "classes": dict(self.class_trainers)})
             else:
                 npc = npcs.get(str(e["npc"]))
-                if npc and pts(npc, ZONE):
-                    self.errands.append({**e, "pos": centroid(pts(npc, ZONE))})
+                if npc and pts(npc, route.ZONE):
+                    self.errands.append({**e, "pos": centroid(pts(npc, route.ZONE))})
 
     # ---- Grundfunktionen -------------------------------------------------
     def mob_xp(self, level, m):
         npc = self.npcs[str(m)]
-        ml = round(((npc["min_level"] or level) + (npc["max_level"] or level)) / 2)
+        ml = npc_level(npc, level)
         elite = (npc["rank"] or 0) > 0
         return mob_base_xp(level, ml) * (P["elite_xp_multiplier"] if elite else 1.0), elite
 
     def leg(self, a, b):
-        return (yards(a, b, ZONE) or 0.0) / P["run_speed_yards_per_s"]
+        return (yards(a, b, route.ZONE) or 0.0) / P["run_speed_yards_per_s"]
 
     def levelup(self, level, xp):
         while level in self.need_xp and xp >= self.need_xp[level]:
@@ -129,7 +138,7 @@ class World:
         return level, xp
 
     def nearest_spawn(self, pos, m):
-        return min(self.spawns[m], key=lambda p: yards(pos, p, ZONE))
+        return min(self.spawns[m], key=lambda p: yards(pos, p, route.ZONE))
 
     def speed_mult(self, trained):
         """Kampf-Zeitfaktor durch erlernte Faehigkeitsstufen (Errand 'Lehrer')."""
@@ -185,7 +194,7 @@ class World:
         return self._hits[key]
 
     def initial_state(self):
-        return State(t=0.0, pos=self.start, level=1, xp=0.0, total=0.0, done=frozenset(), open={}, parent=None,
+        return State(t=0.0, pos=self.start, level=self.start_level, xp=self.start_xp, total=0.0, done=frozenset(), open={}, parent=None,
                      act="start", rec=("start", None, 0.0, (), (), self.start, "walk"), shared=0,
                      home=self.home0, hearth_ready=0.0, flights=frozenset(), trained=0)
 
@@ -451,7 +460,7 @@ def _geom(rng, p):
 
 def replay(w, recs, target, rng):
     """Spielt den Plan mit gewuerfelten Drops nach. Fehlende Items kosten Zusatz-Kills (Weg hin und zurueck)."""
-    t, level, xp = 0.0, 1, 0.0
+    t, level, xp = 0.0, w.start_level, w.start_xp
     open_ = {}
     for rec in recs[1:]:
         typ, qid, dt, events, kills_main, end = rec[:6]
@@ -489,14 +498,15 @@ def monte_carlo(w, end, target, runs, seed=1):
     return {"mean": statistics.mean(ts), "median": ts[len(ts) // 2], "p10": ts[int(0.1 * len(ts))], "p90": ts[int(0.9 * len(ts))]}
 
 
-def build_world(race_bit=1):
+def build_world(race_bit=1, world="elwynn"):
     return World(load("quests.json"), load("npcs.json"), load("objects.json"), load("items.json"),
-                 load("drops.json"), load("quest_xp_table.json"), race_bit)
+                 load("drops.json"), load("quest_xp_table.json"), race_bit, world)
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--target-level", type=int, default=10)
+    ap.add_argument("--world", default="elwynn", choices=sorted(WORLDS))
+    ap.add_argument("--target-level", type=int, default=None, help="Standard: Zielstufe der Welt")
     ap.add_argument("--beam", type=int, default=150)
     ap.add_argument("--bucket", type=float, default=20.0)
     ap.add_argument("--race-bit", type=int, default=1)
@@ -509,8 +519,10 @@ def main():
         P[name] = float(val)
     if a.with_trainer:
         P["errands"] = [P["_errands_beispiel"]]
-    w = build_world(a.race_bit)
-    lines = [f"# Routenplanung (Strahlsuche + Monte Carlo), Mensch, Level 1 -> {a.target_level}", "",
+    w = build_world(a.race_bit, a.world)
+    if a.target_level is None:
+        a.target_level = w.cfg["target_level"]
+    lines = [f"# Routenplanung (Strahlsuche + Monte Carlo), {w.cfg['title']}, Mensch, Level {w.start_level} -> {a.target_level}", "",
              "ANNAHMEN (nicht gemessen): `pipeline/config/params.json`. Buendelung, Schlenker, Ruhestein und Grinden ergeben sich aus der Suche, es gibt keine Gruppen oder Schwellen.",
              f"Suchparameter: Strahlbreite {a.beam}, Zeit-Eimer {a.bucket:.0f} s. Zufall: {P['mc_runs']} Nachspielungen mit gewuerfelten Drops.",
              f"Questlog-Plaetze: {w.slots}. Ruhestein-Heimat am Start: {'gesetzt' if w.home0 else 'nicht gesetzt'}, Gastwirte in der Zone: {len(w.inns)}. Errands: {[e['id'] for e in w.errands] or 'keine'}.", ""]
@@ -529,11 +541,17 @@ def main():
         for s in steps[1:]:
             modes[s.rec[6]] += 1
             kinds[s.rec[0]] += 1
+        # Anteil Grinden an Zeit und XP (die Zahl der Grind-Schritte ist nur die Portionierung der Suche)
+        g_t = sum(st.rec[2] for st in steps[1:] if st.rec[0] == "grind")
+        g_xp = sum(st.total - st.parent.total for st in steps[1:] if st.rec[0] == "grind")
+        share_t = 100 * g_t / max(end.t, 1.0)
+        share_xp = 100 * g_xp / max(end.total, 1.0)
         acts = [f"| {s.t/60:.1f} | {s.level} | {len(s.open)} | {s.act}{' [' + s.rec[6] + ']' if s.rec[6] != 'walk' else ''} |" for s in steps[1:]]
         lines += [f"## {label}",
                   f"Plan (Erwartungswerte): Level {a.target_level} nach **{end.t/60:.1f} min**, {len(end.done)} Quests abgegeben, "
                   f"bis zu {max_open} gleichzeitig offen, geteilte Kills: {end.shared}",
                   f"Handlungen: {dict(kinds)}. Wegarten: {dict(modes)}",
+                  f"Anteil Grinden: {share_t:.0f} % der Zeit, {share_xp:.0f} % der XP",
                   f"Mit gewuerfelten Drops (gleicher Plan): Mittel {mc['mean']/60:.1f} min, Median {mc['median']/60:.1f} min, "
                   f"10 %-Quantil {mc['p10']/60:.1f} min, 90 %-Quantil {mc['p90']/60:.1f} min", "",
                   "| Min | Level | offen | Handlung |", "|---|---|---|---|", *acts, ""]
@@ -542,7 +560,7 @@ def main():
         lines.append(f"Vergleich (Erwartungswerte): frei {f.t/60:.1f} min, eine Quest zur Zeit {o.t/60:.1f} min "
                      f"({100*(1-f.t/o.t):.0f} % weniger). Ohne Gewaehr, siehe Annahmen.")
     REPORTS.mkdir(parents=True, exist_ok=True)
-    (REPORTS / "planner_report.md").write_text("\n".join(lines), encoding="utf-8")
+    (REPORTS / ("planner_report.md" if a.world == "elwynn" else f"planner_report_{a.world}.md")).write_text("\n".join(lines), encoding="utf-8")
     print("\n".join(lines))
 
 

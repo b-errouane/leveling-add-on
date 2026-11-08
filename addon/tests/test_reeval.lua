@@ -1,5 +1,6 @@
 -- Offline tests for the live re-evaluation (run from the repo root: luajit addon/tests/test_reeval.lua)
-dofile("addon/ForeverLeveler/Plan.lua")
+dofile("addon/ForeverLeveler/Plans/elwynn.lua")
+ForeverLevelerPlan = ForeverLevelerPlans.elwynn
 dofile("addon/ForeverLeveler/Reeval.lua")
 local Plan, R = ForeverLevelerPlan, ForeverLevelerReeval
 local params, steps = Plan.meta.params, Plan.steps

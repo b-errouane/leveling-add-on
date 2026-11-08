@@ -10,7 +10,8 @@
 -- Commands: /fl  (status) | list | skip | back | show | hide | arrow | reset | about
 
 local ADDON = "ForeverLeveler"
-local Plan = ForeverLevelerPlan
+local Plan        -- the active plan (one of ForeverLevelerPlans, see pickPlan)
+local planName
 local db
 local frame, lineHead, lineMain, lineHint, skipBtn
 local current = 0
@@ -217,7 +218,46 @@ local function progress()
     return doneCount, n
 end
 
-local function refresh(force)
+-- ---- Plan selection --------------------------------------------------------------------------------------
+local function planNames()
+    local names = {}
+    for name in pairs(ForeverLevelerPlans or {}) do names[#names + 1] = name end
+    table.sort(names, function(a, b) return ForeverLevelerPlans[a].meta.startLevel < ForeverLevelerPlans[b].meta.startLevel end)
+    return names
+end
+
+-- Manual choice (/fl use <name>) wins. Otherwise: the plan whose level range contains the player's level,
+-- else the last plan that starts at or below the level, else the first plan.
+local function pickPlan()
+    local plans = ForeverLevelerPlans or {}
+    if db and db.planName and plans[db.planName] then return plans[db.planName], db.planName end
+    local level = UnitLevel("player") or 1
+    local names = planNames()
+    local fallback
+    for _, name in ipairs(names) do
+        local m = plans[name].meta
+        if level >= m.startLevel and level < m.targetLevel then return plans[name], name end
+        if level >= m.startLevel then fallback = name end
+    end
+    local name = fallback or names[1]
+    return name and plans[name] or nil, name
+end
+
+local refresh
+
+local function usePlan(name)
+    local plans = ForeverLevelerPlans or {}
+    if not plans[name] then return false end
+    Plan, planName = plans[name], name
+    db.skipped = {}
+    lastPos = nil
+    cache.i, cache.planNext, cache.at = nil, nil, -1000
+    current = 0
+    if frame then refresh(true) end
+    return true
+end
+
+function refresh(force)
     if not db or not Plan or not frame then return end
     local i, planNext = recommended(force)
     local level = UnitLevel("player") or 1
@@ -382,6 +422,25 @@ SLASH_FL1 = "/fl"
 SlashCmdList["FL"] = function(msg)
     local cmd = string.lower(string.match(msg or "", "^(%S*)") or "")
     if cmd == "list" then list()
+    elseif cmd == "plans" then
+        for _, name in ipairs(planNames()) do
+            local m = ForeverLevelerPlans[name].meta
+            print(string.format("|cffffd200FL|r %s%s: %s, Level %d-%d, geplant %.0f min", name == planName and "> " or "  ", name,
+                tostring(m.title), m.startLevel, m.targetLevel, m.plannedMinutes or 0))
+        end
+    elseif cmd == "use" then
+        local arg = string.match(msg or "", "^%S+%s+(%S+)")
+        if arg == "auto" then
+            db.planName = nil
+            local p, name = pickPlan()
+            if p then usePlan(name) print("|cffffd200FL|r automatisch: " .. name) end
+        elseif arg and ForeverLevelerPlans and ForeverLevelerPlans[arg] then
+            db.planName = arg
+            usePlan(arg)
+            print("|cffffd200FL|r Plan: " .. arg)
+        else
+            print("|cffffd200FL|r /fl use <name|auto>, siehe /fl plans")
+        end
     elseif cmd == "plan" then
         db.followPlan = not db.followPlan
         print("|cffffd200FL|r " .. (db.followPlan and "strikt nach Plan (keine Neubewertung)" or "Neubewertung aktiv"))
@@ -442,7 +501,7 @@ SlashCmdList["FL"] = function(msg)
         print("|cffffd200FL|r " .. tostring(Plan.meta.note))
         print("|cffffd200FL|r Quellen: " .. tostring(Plan.meta.sources))
     else
-        print("|cffffd200FL|r /fl list | why | plan | side | skip | back | show | hide | arrow | scale | lock | reset | about")
+        print("|cffffd200FL|r /fl list | why | plan | plans | use | side | skip | back | show | hide | arrow | scale | lock | reset | about")
         refresh(true)
     end
 end
@@ -454,12 +513,13 @@ ev:SetScript("OnEvent", function(_, event, ...)
         ForeverLevelerDB = ForeverLevelerDB or {}
         db = ForeverLevelerDB
         db.skipped = db.skipped or {}
+        Plan, planName = pickPlan()
         if not Plan or not Plan.steps then
-            print("|cffffd200FL|r Plan.lua fehlt oder ist leer.")
+            print("|cffffd200FL|r Kein Plan gefunden (Plans\\*.lua fehlt oder ist leer).")
             return
         end
         build()
-        print("|cffffd200FL|r geladen. /fl fuer Befehle.")
+        print("|cffffd200FL|r geladen. Plan: " .. tostring(planName) .. ". /fl fuer Befehle.")
         local _, race = UnitRace("player")
         if race and Plan.meta.race and string.lower(race) ~= string.lower(Plan.meta.race) then
             print("|cffffd200FL|r Hinweis: Der Plan ist fuer " .. Plan.meta.race .. " erstellt, du spielst " .. tostring(race) .. ".")
@@ -467,6 +527,11 @@ ev:SetScript("OnEvent", function(_, event, ...)
         return
     end
     if not db or not frame then return end
+    -- Automatic mode: when the level moves out of the current plan's range, switch to the matching plan.
+    if event == "PLAYER_LEVEL_UP" and not db.planName then
+        local p, name = pickPlan()
+        if p and name ~= planName then usePlan(name) print("|cffffd200FL|r Neuer Plan: " .. name) end
+    end
     -- Changes that really alter the situation recompute immediately; bursty log updates are throttled.
     local immediate = event == "PLAYER_ENTERING_WORLD" or event == "QUEST_ACCEPTED" or event == "QUEST_TURNED_IN"
         or event == "QUEST_REMOVED" or event == "PLAYER_LEVEL_UP"
